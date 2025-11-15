@@ -14,16 +14,385 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      agents: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_paper_trading: boolean
+          name: string
+          status: Database["public"]["Enums"]["agent_status"]
+          updated_at: string
+          user_id: string
+          workflow_json: Json
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_paper_trading?: boolean
+          name: string
+          status?: Database["public"]["Enums"]["agent_status"]
+          updated_at?: string
+          user_id: string
+          workflow_json?: Json
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_paper_trading?: boolean
+          name?: string
+          status?: Database["public"]["Enums"]["agent_status"]
+          updated_at?: string
+          user_id?: string
+          workflow_json?: Json
+        }
+        Relationships: []
+      }
+      alerts: {
+        Row: {
+          agent_id: string | null
+          created_at: string
+          id: string
+          is_read: boolean
+          message: string
+          severity: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          agent_id?: string | null
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message: string
+          severity?: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          agent_id?: string | null
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          severity?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alerts_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exchange_connections: {
+        Row: {
+          api_key_encrypted: string
+          api_secret_encrypted: string
+          created_at: string
+          exchange_name: string
+          id: string
+          is_active: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          api_key_encrypted: string
+          api_secret_encrypted: string
+          created_at?: string
+          exchange_name: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          api_key_encrypted?: string
+          api_secret_encrypted?: string
+          created_at?: string
+          exchange_name?: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      executions: {
+        Row: {
+          agent_id: string
+          completed_at: string | null
+          error_message: string | null
+          id: string
+          logs: Json | null
+          started_at: string
+          status: Database["public"]["Enums"]["execution_status"]
+          user_id: string
+        }
+        Insert: {
+          agent_id: string
+          completed_at?: string | null
+          error_message?: string | null
+          id?: string
+          logs?: Json | null
+          started_at?: string
+          status?: Database["public"]["Enums"]["execution_status"]
+          user_id: string
+        }
+        Update: {
+          agent_id?: string
+          completed_at?: string | null
+          error_message?: string | null
+          id?: string
+          logs?: Json | null
+          started_at?: string
+          status?: Database["public"]["Enums"]["execution_status"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "executions_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      portfolios: {
+        Row: {
+          asset_symbol: string
+          average_buy_price: number | null
+          current_value: number | null
+          exchange_connection_id: string | null
+          id: string
+          last_updated: string
+          quantity: number
+          user_id: string
+        }
+        Insert: {
+          asset_symbol: string
+          average_buy_price?: number | null
+          current_value?: number | null
+          exchange_connection_id?: string | null
+          id?: string
+          last_updated?: string
+          quantity?: number
+          user_id: string
+        }
+        Update: {
+          asset_symbol?: string
+          average_buy_price?: number | null
+          current_value?: number | null
+          exchange_connection_id?: string | null
+          id?: string
+          last_updated?: string
+          quantity?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portfolios_exchange_connection_id_fkey"
+            columns: ["exchange_connection_id"]
+            isOneToOne: false
+            referencedRelation: "exchange_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          full_name: string | null
+          id: string
+          investment_goals: string | null
+          investor_type: string | null
+          risk_tolerance: Database["public"]["Enums"]["risk_tolerance"] | null
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id: string
+          investment_goals?: string | null
+          investor_type?: string | null
+          risk_tolerance?: Database["public"]["Enums"]["risk_tolerance"] | null
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          investment_goals?: string | null
+          investor_type?: string | null
+          risk_tolerance?: Database["public"]["Enums"]["risk_tolerance"] | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          agent_id: string | null
+          asset_symbol: string
+          exchange_connection_id: string | null
+          executed_at: string
+          execution_id: string | null
+          fees: number | null
+          id: string
+          is_paper_trade: boolean
+          order_type: Database["public"]["Enums"]["order_type"]
+          price: number
+          quantity: number
+          total_value: number
+          transaction_type: Database["public"]["Enums"]["transaction_type"]
+          user_id: string
+        }
+        Insert: {
+          agent_id?: string | null
+          asset_symbol: string
+          exchange_connection_id?: string | null
+          executed_at?: string
+          execution_id?: string | null
+          fees?: number | null
+          id?: string
+          is_paper_trade?: boolean
+          order_type: Database["public"]["Enums"]["order_type"]
+          price: number
+          quantity: number
+          total_value: number
+          transaction_type: Database["public"]["Enums"]["transaction_type"]
+          user_id: string
+        }
+        Update: {
+          agent_id?: string | null
+          asset_symbol?: string
+          exchange_connection_id?: string | null
+          executed_at?: string
+          execution_id?: string | null
+          fees?: number | null
+          id?: string
+          is_paper_trade?: boolean
+          order_type?: Database["public"]["Enums"]["order_type"]
+          price?: number
+          quantity?: number
+          total_value?: number
+          transaction_type?: Database["public"]["Enums"]["transaction_type"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_exchange_connection_id_fkey"
+            columns: ["exchange_connection_id"]
+            isOneToOne: false
+            referencedRelation: "exchange_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      workflows: {
+        Row: {
+          agent_id: string
+          created_at: string
+          edges: Json
+          id: string
+          nodes: Json
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          edges?: Json
+          id?: string
+          nodes?: Json
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          edges?: Json
+          id?: string
+          nodes?: Json
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflows_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      agent_status: "draft" | "active" | "paused" | "error"
+      app_role: "admin" | "user"
+      execution_status:
+        | "pending"
+        | "running"
+        | "completed"
+        | "failed"
+        | "cancelled"
+      order_type: "market" | "limit"
+      risk_tolerance: "conservative" | "moderate" | "aggressive"
+      transaction_type: "buy" | "sell"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +519,19 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      agent_status: ["draft", "active", "paused", "error"],
+      app_role: ["admin", "user"],
+      execution_status: [
+        "pending",
+        "running",
+        "completed",
+        "failed",
+        "cancelled",
+      ],
+      order_type: ["market", "limit"],
+      risk_tolerance: ["conservative", "moderate", "aggressive"],
+      transaction_type: ["buy", "sell"],
+    },
   },
 } as const
