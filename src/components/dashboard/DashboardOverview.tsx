@@ -1,8 +1,11 @@
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Bot, Plus, TrendingUp, Zap, AlertCircle } from "lucide-react";
 
 export const DashboardOverview = () => {
+  const navigate = useNavigate();
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -12,7 +15,7 @@ export const DashboardOverview = () => {
             Welcome to your InvestAI control center
           </p>
         </div>
-        <Button className="gap-2">
+        <Button className="gap-2" onClick={() => navigate('/agent-builder')}>
           <Plus className="h-4 w-4" />
           Create Agent
         </Button>
