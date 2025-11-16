@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Bot, Plus, TrendingUp, Zap, AlertCircle } from "lucide-react";
+import { ExecutionHistory } from "./ExecutionHistory";
 
 export const DashboardOverview = () => {
   const navigate = useNavigate();
@@ -118,20 +119,7 @@ export const DashboardOverview = () => {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>Your latest agent executions</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <Bot className="h-12 w-12 text-muted-foreground/50 mb-4" />
-              <p className="text-sm text-muted-foreground">
-                No activity yet. Create your first agent to get started!
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <ExecutionHistory />
       </div>
     </div>
   );

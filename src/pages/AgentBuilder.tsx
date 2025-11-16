@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ReactFlow,
@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/input';
 import { Save, Play, ArrowLeft } from 'lucide-react';
 import { NodeType, AgentNodeData, NODE_DEFINITIONS } from '@/types/workflow';
 import { useToast } from '@/hooks/use-toast';
+import { useWorkflowExecution } from '@/hooks/useWorkflowExecution';
 import { supabase } from '@/integrations/supabase/client';
 
 const nodeTypes = {
@@ -36,11 +37,51 @@ const AgentBuilderContent = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const { toast } = useToast();
+  const { executeWorkflow, isExecuting } = useWorkflowExecution();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [workflowName, setWorkflowName] = useState('Untitled Agent');
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (id) {
+      loadWorkflow(id);
+    }
+  }, [id]);
+
+  const loadWorkflow = async (agentId: string) => {
+    try {
+      const { data: agent, error: agentError } = await supabase
+        .from('agents')
+        .select('*')
+        .eq('id', agentId)
+        .single();
+
+      if (agentError) throw agentError;
+      
+      setWorkflowName(agent.name);
+
+      const { data: workflow, error: workflowError } = await supabase
+        .from('workflows')
+        .select('*')
+        .eq('agent_id', agentId)
+        .single();
+
+      if (workflowError) throw workflowError;
+
+      if (workflow.nodes) setNodes(workflow.nodes as any[]);
+      if (workflow.edges) setEdges(workflow.edges as any[]);
+    } catch (error: any) {
+      console.error('Error loading workflow:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load workflow",
+        variant: "destructive",
+      });
+    }
+  };
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
@@ -89,6 +130,7 @@ const AgentBuilderContent = () => {
   }, []);
 
   const handleSave = async () => {
+    setIsSaving(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -117,6 +159,12 @@ const AgentBuilderContent = () => {
 
         if (agentError) throw agentError;
         agentId = agentData.id;
+      } else {
+        // Update agent name
+        await supabase
+          .from('agents')
+          .update({ name: workflowName })
+          .eq('id', agentId);
       }
 
       // Then save the workflow
@@ -146,6 +194,25 @@ const AgentBuilderContent = () => {
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleTest = async () => {
+    if (!id) {
+      toast({
+        title: "Save First",
+        description: "Please save your workflow before testing",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const result = await executeWorkflow(id, { nodes, edges });
+    
+    if (result.success) {
+      console.log('Execution result:', result.outputs);
     }
   };
 
@@ -168,13 +235,22 @@ const AgentBuilderContent = () => {
           />
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleTest}
+            disabled={isExecuting || !id}
+          >
             <Play className="w-4 h-4 mr-2" />
-            Test
+            {isExecuting ? 'Testing...' : 'Test'}
           </Button>
-          <Button size="sm" onClick={handleSave}>
+          <Button 
+            size="sm" 
+            onClick={handleSave}
+            disabled={isSaving}
+          >
             <Save className="w-4 h-4 mr-2" />
-            Save
+            {isSaving ? 'Saving...' : 'Save'}
           </Button>
         </div>
       </div>

@@ -1,1 +1,10 @@
 project_id = "pqshhuhxvihsxyudcznx"
+
+[functions.workflow-executor]
+verify_jwt = true
+
+[functions.lovable-ai-chat]
+verify_jwt = true
+
+[functions.workflow-scheduler]
+verify_jwt = false
