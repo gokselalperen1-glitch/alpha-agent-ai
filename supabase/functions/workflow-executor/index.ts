@@ -87,7 +87,7 @@ async function executeNode(
         result = await executeScheduleTrigger(node, context);
         break;
       case 'market-data':
-        result = await executeMarketData(node, context);
+        result = await executeMarketData(node, context, supabase);
         break;
       case 'ai-risk-assessment':
         result = await executeAIRiskAssessment(node, context, supabase);
@@ -127,21 +127,58 @@ async function executeScheduleTrigger(node: WorkflowNode, context: ExecutionCont
   };
 }
 
-async function executeMarketData(node: WorkflowNode, context: ExecutionContext) {
-  // Mock market data - in production, connect to real exchange APIs
-  const symbols = node.data.config.symbols || ['BTC/USD'];
-  const data: Record<string, any> = {};
+// Market Data Node - Fetch real-time market data using CCXT
+async function executeMarketData(node: WorkflowNode, context: ExecutionContext, supabase: any) {
+  console.log('Executing Market Data node:', node.data.label);
   
-  for (const symbol of symbols) {
-    data[symbol] = {
-      price: Math.random() * 50000 + 20000, // Mock price
-      volume: Math.random() * 1000000,
-      timestamp: new Date().toISOString(),
-      change24h: (Math.random() - 0.5) * 10,
+  try {
+    // Import CCXT dynamically
+    const ccxtLib = await import('https://esm.sh/ccxt@4.2.25');
+    
+    // Get symbol from node config or use default
+    const symbol = node.data.config?.symbol || 'BTC/USDT';
+    const exchangeName = node.data.config?.exchange || 'binance';
+    
+    // Initialize exchange (using public API, no credentials needed for market data)
+    const ExchangeClass = (ccxtLib as any)[exchangeName.toLowerCase()];
+    if (!ExchangeClass) {
+      throw new Error(`Exchange ${exchangeName} not supported`);
+    }
+    
+    const exchange = new ExchangeClass({
+      enableRateLimit: true,
+    });
+    
+    // Fetch ticker data
+    const ticker = await exchange.fetchTicker(symbol);
+    
+    const marketData = {
+      symbol,
+      exchange: exchangeName,
+      price: ticker.last || 0,
+      high24h: ticker.high || 0,
+      low24h: ticker.low || 0,
+      volume: ticker.baseVolume || 0,
+      change24h: ticker.percentage || 0,
+      bid: ticker.bid || 0,
+      ask: ticker.ask || 0,
+      timestamp: new Date(ticker.timestamp || Date.now()).toISOString(),
     };
+
+    await logNodeExecution(context.executionId, node, 'completed', {
+      dataFetched: marketData,
+    }, supabase);
+
+    return marketData;
+  } catch (error: any) {
+    console.error('Market data fetch error:', error);
+    
+    await logNodeExecution(context.executionId, node, 'failed', {
+      error: error.message,
+    }, supabase);
+    
+    throw error;
   }
-  
-  return { marketData: data };
 }
 
 async function executeAIRiskAssessment(
@@ -211,44 +248,147 @@ async function executeTradeNode(
   context: ExecutionContext,
   supabase: any
 ) {
-  const config = node.data.config;
-  const symbol = config.symbol || 'BTC/USD';
-  const orderType = config.orderType || 'market';
-  const quantity = config.quantity || 0.01;
-
-  // Get market data
-  const marketData = Array.from(context.nodeOutputs.values())
-    .find(output => output?.marketData)?.marketData || {};
+  console.log('Executing Trade node:', node.data.label);
   
-  const price = marketData[symbol]?.price || 0;
-  const totalValue = price * quantity;
+  try {
+    // Get trade parameters from node config
+    const symbol = node.data.config?.symbol || context.nodeOutputs.get('market-data')?.symbol || 'BTC/USDT';
+    const side = node.data.config?.side || 'buy'; // 'buy' or 'sell'
+    const orderType = node.data.config?.orderType || 'market'; // 'market' or 'limit'
+    const quantity = node.data.config?.quantity || 0.001;
+    const isPaperTrading = node.data.config?.isPaperTrading !== false; // Default to paper trading
+    
+    let price = node.data.config?.price || context.nodeOutputs.get('market-data')?.price || 0;
+    let exchangeOrderId = null;
+    
+    // If live trading, execute via CCXT
+    if (!isPaperTrading) {
+      // Get user's exchange connection
+      const { data: connections } = await supabase
+        .from('exchange_connections')
+        .select('*')
+        .eq('user_id', context.userId)
+        .eq('is_active', true)
+        .limit(1);
+      
+      if (!connections || connections.length === 0) {
+        throw new Error('No active exchange connection found');
+      }
+      
+      const connection = connections[0];
+      
+      // Import CCXT
+      const ccxtLib = await import('https://esm.sh/ccxt@4.2.25');
+      const ExchangeClass = (ccxtLib as any)[connection.exchange_name.toLowerCase()];
+      
+      if (!ExchangeClass) {
+        throw new Error(`Exchange ${connection.exchange_name} not supported`);
+      }
+      
+      // Initialize exchange with credentials
+      const exchange = new ExchangeClass({
+        apiKey: connection.api_key_encrypted, // TODO: Decrypt using Supabase Vault
+        secret: connection.api_secret_encrypted,
+        enableRateLimit: true,
+      });
+      
+      // Check balance before trading
+      const balance = await exchange.fetchBalance();
+      const [base, quote] = symbol.split('/');
+      
+      if (side === 'buy') {
+        const requiredBalance = quantity * price;
+        if (!balance[quote] || balance[quote].free < requiredBalance) {
+          throw new Error(`Insufficient ${quote} balance`);
+        }
+      } else {
+        if (!balance[base] || balance[base].free < quantity) {
+          throw new Error(`Insufficient ${base} balance`);
+        }
+      }
+      
+      // Place order
+      const order = await exchange.createOrder(symbol, orderType, side, quantity, orderType === 'limit' ? price : undefined);
+      exchangeOrderId = order.id;
+      price = order.price || price;
+      
+      console.log('Live trade executed:', order);
+    }
 
-  // Record transaction
-  const { data: transaction, error } = await supabase
-    .from('transactions')
-    .insert([{
-      user_id: context.userId,
-      agent_id: context.agentId,
-      execution_id: context.executionId,
-      asset_symbol: symbol,
-      transaction_type: config.action || 'buy',
-      order_type: orderType,
-      quantity: quantity,
-      price: price,
-      total_value: totalValue,
-      is_paper_trade: context.isPaperTrading,
-      fees: totalValue * 0.001, // 0.1% fee
-    }])
-    .select()
-    .single();
+    // Record transaction
+    const { error: txError } = await supabase
+      .from('transactions')
+      .insert({
+        user_id: context.userId,
+        agent_id: context.agentId,
+        execution_id: context.executionId,
+        asset_symbol: symbol,
+        transaction_type: side,
+        order_type: orderType,
+        quantity,
+        price,
+        total_value: quantity * price,
+        is_paper_trade: isPaperTrading,
+      });
 
-  if (error) throw error;
+    if (txError) {
+      console.error('Failed to record transaction:', txError);
+    }
+    
+    // Update portfolio
+    const { data: existingPortfolio } = await supabase
+      .from('portfolios')
+      .select('*')
+      .eq('user_id', context.userId)
+      .eq('asset_symbol', symbol.split('/')[0])
+      .single();
+    
+    if (existingPortfolio) {
+      const newQuantity = side === 'buy' 
+        ? existingPortfolio.quantity + quantity 
+        : existingPortfolio.quantity - quantity;
+      
+      const newAvgPrice = side === 'buy'
+        ? ((existingPortfolio.average_buy_price * existingPortfolio.quantity) + (price * quantity)) / newQuantity
+        : existingPortfolio.average_buy_price;
+      
+      await supabase
+        .from('portfolios')
+        .update({
+          quantity: newQuantity,
+          average_buy_price: newAvgPrice,
+          current_value: newQuantity * price,
+          last_updated: new Date().toISOString(),
+        })
+        .eq('id', existingPortfolio.id);
+    } else if (side === 'buy') {
+      await supabase
+        .from('portfolios')
+        .insert({
+          user_id: context.userId,
+          asset_symbol: symbol.split('/')[0],
+          quantity,
+          average_buy_price: price,
+          current_value: quantity * price,
+        });
+    }
 
-  return {
-    trade: transaction,
-    executed: true,
-    isPaperTrade: context.isPaperTrading,
-  };
+    const tradeData = {
+      symbol,
+      type: orderType,
+      side,
+      quantity,
+      price,
+      totalValue: quantity * price,
+      isPaperTrading,
+      exchangeOrderId,
+    };
+
+    return { success: true, trade: tradeData };
+  } catch (error: any) {
+    console.error('Trade execution error:', error);
+    throw error;
+  }
 }
 
 async function executeSendAlert(

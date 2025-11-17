@@ -7,6 +7,8 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import AgentBuilder from "./pages/AgentBuilder";
+import ExchangeConnections from "./pages/ExchangeConnections";
+import Portfolio from "./pages/Portfolio";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -23,6 +25,8 @@ const App = () => (
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/agent-builder" element={<AgentBuilder />} />
           <Route path="/agent-builder/:id" element={<AgentBuilder />} />
+          <Route path="/exchange-connections" element={<ExchangeConnections />} />
+          <Route path="/portfolio" element={<Portfolio />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

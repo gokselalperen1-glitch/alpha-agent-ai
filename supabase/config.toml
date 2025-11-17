@@ -8,3 +8,6 @@ verify_jwt = true
 
 [functions.workflow-scheduler]
 verify_jwt = false
+
+[functions.manage-exchange-connection]
+verify_jwt = true
