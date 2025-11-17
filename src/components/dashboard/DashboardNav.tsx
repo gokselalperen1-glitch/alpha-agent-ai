@@ -25,21 +25,21 @@ export const DashboardNav = ({ user }: DashboardNavProps) => {
           <div className="flex items-center gap-8">
             <h1 className="text-xl font-bold">InvestAI</h1>
             <div className="hidden md:flex items-center gap-6">
-              <Button variant="ghost" size="sm" className="gap-2">
+              <Button variant="ghost" size="sm" className="gap-2" onClick={() => navigate('/dashboard')}>
                 <LayoutDashboard className="h-4 w-4" />
                 Overview
               </Button>
-              <Button variant="ghost" size="sm" className="gap-2">
+              <Button variant="ghost" size="sm" className="gap-2" onClick={() => navigate('/agent-builder')}>
                 <Bot className="h-4 w-4" />
                 My Agents
               </Button>
-              <Button variant="ghost" size="sm" className="gap-2">
+              <Button variant="ghost" size="sm" className="gap-2" onClick={() => navigate('/portfolio')}>
                 <Wallet className="h-4 w-4" />
                 Portfolio
               </Button>
-              <Button variant="ghost" size="sm" className="gap-2">
+              <Button variant="ghost" size="sm" className="gap-2" onClick={() => navigate('/exchange-connections')}>
                 <Settings className="h-4 w-4" />
-                Settings
+                Connections
               </Button>
             </div>
           </div>
