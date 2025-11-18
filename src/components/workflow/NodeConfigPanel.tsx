@@ -4,6 +4,10 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScheduleTriggerConfig } from "./config/ScheduleTriggerConfig";
 import { MarketDataConfig } from "./config/MarketDataConfig";
+import { TechnicalIndicatorsConfig } from "./config/TechnicalIndicatorsConfig";
+import { SentimentAnalysisConfig } from "./config/SentimentAnalysisConfig";
+import { NewsMonitorConfig } from "./config/NewsMonitorConfig";
+import { FundamentalAnalysisConfig } from "./config/FundamentalAnalysisConfig";
 import { AIRiskConfig } from "./config/AIRiskConfig";
 import { ExecuteTradeConfig } from "./config/ExecuteTradeConfig";
 import { SendAlertConfig } from "./config/SendAlertConfig";
@@ -27,6 +31,14 @@ export const NodeConfigPanel = ({ nodeId, nodeData, onClose, onUpdate }: NodeCon
         return <ScheduleTriggerConfig config={nodeData.config} onUpdate={handleConfigUpdate} />;
       case 'market-data':
         return <MarketDataConfig config={nodeData.config} onUpdate={handleConfigUpdate} />;
+      case 'technical-indicators':
+        return <TechnicalIndicatorsConfig config={nodeData.config} onUpdate={handleConfigUpdate} />;
+      case 'sentiment-analysis':
+        return <SentimentAnalysisConfig config={nodeData.config} onUpdate={handleConfigUpdate} />;
+      case 'news-monitor':
+        return <NewsMonitorConfig config={nodeData.config} onUpdate={handleConfigUpdate} />;
+      case 'fundamental-analysis':
+        return <FundamentalAnalysisConfig config={nodeData.config} onUpdate={handleConfigUpdate} />;
       case 'ai-risk-assessment':
         return <AIRiskConfig config={nodeData.config} onUpdate={handleConfigUpdate} />;
       case 'execute-trade':
