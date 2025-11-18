@@ -16,6 +16,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { CustomNode } from '@/components/workflow/CustomNode';
 import { NodeLibrary } from '@/components/workflow/NodeLibrary';
+import { NodeConfigPanel } from '@/components/workflow/NodeConfigPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Save, Play, ArrowLeft } from 'lucide-react';
@@ -44,6 +45,7 @@ const AgentBuilderContent = () => {
   const [workflowName, setWorkflowName] = useState('Untitled Agent');
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -87,6 +89,31 @@ const AgentBuilderContent = () => {
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
     [setEdges]
   );
+
+  const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
+    setSelectedNodeId(node.id);
+  }, []);
+
+  const onPaneClick = useCallback(() => {
+    setSelectedNodeId(null);
+  }, []);
+
+  const updateNodeConfig = useCallback((nodeId: string, config: any) => {
+    setNodes((nds) =>
+      nds.map((node) => {
+        if (node.id === nodeId) {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              config,
+            },
+          };
+        }
+        return node;
+      })
+    );
+  }, [setNodes]);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -268,6 +295,8 @@ const AgentBuilderContent = () => {
             onInit={setReactFlowInstance}
             onDrop={onDrop}
             onDragOver={onDragOver}
+            onNodeClick={onNodeClick}
+            onPaneClick={onPaneClick}
             nodeTypes={nodeTypes}
             fitView
           >
@@ -276,6 +305,15 @@ const AgentBuilderContent = () => {
             <MiniMap />
           </ReactFlow>
         </div>
+
+        {selectedNodeId && (
+          <NodeConfigPanel
+            nodeId={selectedNodeId}
+            nodeData={nodes.find(n => n.id === selectedNodeId)?.data as AgentNodeData}
+            onClose={() => setSelectedNodeId(null)}
+            onUpdate={updateNodeConfig}
+          />
+        )}
       </div>
     </div>
   );
