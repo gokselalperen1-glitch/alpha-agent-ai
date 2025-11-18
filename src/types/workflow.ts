@@ -1,6 +1,10 @@
 export type NodeType = 
   | 'schedule-trigger'
   | 'market-data'
+  | 'technical-indicators'
+  | 'sentiment-analysis'
+  | 'news-monitor'
+  | 'fundamental-analysis'
   | 'ai-risk-assessment'
   | 'execute-trade'
   | 'send-alert'
@@ -43,8 +47,8 @@ export interface Workflow {
 
 export const NODE_CATEGORIES = {
   triggers: ['schedule-trigger'],
-  data: ['market-data'],
-  analysis: ['ai-risk-assessment'],
+  data: ['market-data', 'technical-indicators', 'news-monitor', 'fundamental-analysis'],
+  analysis: ['ai-risk-assessment', 'sentiment-analysis'],
   actions: ['execute-trade', 'send-alert'],
   logic: ['if-condition'],
 } as const;
@@ -59,6 +63,30 @@ export const NODE_DEFINITIONS = {
   'market-data': {
     label: 'Market Data',
     description: 'Fetch real-time market data',
+    category: 'data',
+    color: 'hsl(var(--primary))',
+  },
+  'technical-indicators': {
+    label: 'Technical Indicators',
+    description: 'Calculate RSI, MACD, moving averages',
+    category: 'data',
+    color: 'hsl(var(--primary))',
+  },
+  'sentiment-analysis': {
+    label: 'Sentiment Analysis',
+    description: 'Analyze market sentiment from social media',
+    category: 'analysis',
+    color: 'hsl(var(--secondary))',
+  },
+  'news-monitor': {
+    label: 'News Monitor',
+    description: 'Track breaking financial news',
+    category: 'data',
+    color: 'hsl(var(--primary))',
+  },
+  'fundamental-analysis': {
+    label: 'Fundamental Analysis',
+    description: 'Analyze company fundamentals',
     category: 'data',
     color: 'hsl(var(--primary))',
   },

@@ -28,6 +28,10 @@ import { supabase } from '@/integrations/supabase/client';
 const nodeTypes = {
   'schedule-trigger': CustomNode,
   'market-data': CustomNode,
+  'technical-indicators': CustomNode,
+  'sentiment-analysis': CustomNode,
+  'news-monitor': CustomNode,
+  'fundamental-analysis': CustomNode,
   'ai-risk-assessment': CustomNode,
   'execute-trade': CustomNode,
   'send-alert': CustomNode,
