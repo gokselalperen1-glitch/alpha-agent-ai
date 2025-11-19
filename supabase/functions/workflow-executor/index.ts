@@ -89,6 +89,18 @@ async function executeNode(
       case 'market-data':
         result = await executeMarketData(node, context, supabase);
         break;
+      case 'technical-indicators':
+        result = await executeTechnicalIndicators(node, context, supabase);
+        break;
+      case 'sentiment-analysis':
+        result = await executeSentimentAnalysis(node, context, supabase);
+        break;
+      case 'news-monitor':
+        result = await executeNewsMonitor(node, context, supabase);
+        break;
+      case 'fundamental-analysis':
+        result = await executeFundamentalAnalysis(node, context, supabase);
+        break;
       case 'ai-risk-assessment':
         result = await executeAIRiskAssessment(node, context, supabase);
         break;
@@ -177,6 +189,178 @@ async function executeMarketData(node: WorkflowNode, context: ExecutionContext, 
       error: error.message,
     }, supabase);
     
+    throw error;
+  }
+}
+
+// Technical Indicators Node - Fetch technical analysis data
+async function executeTechnicalIndicators(
+  node: WorkflowNode,
+  context: ExecutionContext,
+  supabase: any
+) {
+  console.log('Executing Technical Indicators node:', node.data.label);
+  
+  try {
+    const { symbol, indicator, interval, time_period } = node.data.config;
+    
+    const { data, error } = await supabase.functions.invoke('api-connector', {
+      body: {
+        provider: 'alphavantage',
+        action: 'technical-indicator',
+        params: { symbol, indicator, interval, time_period }
+      }
+    });
+    
+    if (error) throw error;
+    
+    const result = {
+      indicator: indicator,
+      symbol: symbol,
+      interval: interval,
+      data: data,
+      timestamp: new Date().toISOString()
+    };
+    
+    return result;
+  } catch (error: any) {
+    console.error('Technical indicators fetch error:', error);
+    throw error;
+  }
+}
+
+// Sentiment Analysis Node - Fetch sentiment data from StockTwits
+async function executeSentimentAnalysis(
+  node: WorkflowNode,
+  context: ExecutionContext,
+  supabase: any
+) {
+  console.log('Executing Sentiment Analysis node:', node.data.label);
+  
+  try {
+    const { symbol } = node.data.config;
+    
+    const { data, error } = await supabase.functions.invoke('api-connector', {
+      body: {
+        provider: 'stocktwits',
+        action: 'stream',
+        params: { symbol }
+      }
+    });
+    
+    if (error) throw error;
+    
+    // Calculate sentiment score from messages
+    const messages = data.messages || [];
+    let bullishCount = 0;
+    let bearishCount = 0;
+    
+    messages.forEach((msg: any) => {
+      if (msg.entities?.sentiment?.basic === 'Bullish') bullishCount++;
+      if (msg.entities?.sentiment?.basic === 'Bearish') bearishCount++;
+    });
+    
+    const totalSentiment = bullishCount + bearishCount;
+    const sentimentScore = totalSentiment > 0 
+      ? (bullishCount - bearishCount) / totalSentiment 
+      : 0;
+    
+    const result = {
+      symbol: symbol,
+      sentimentScore: sentimentScore,
+      bullishCount: bullishCount,
+      bearishCount: bearishCount,
+      totalMessages: messages.length,
+      messages: messages.slice(0, 10), // Keep only top 10
+      timestamp: new Date().toISOString()
+    };
+    
+    return result;
+  } catch (error: any) {
+    console.error('Sentiment analysis fetch error:', error);
+    throw error;
+  }
+}
+
+// News Monitor Node - Fetch latest news
+async function executeNewsMonitor(
+  node: WorkflowNode,
+  context: ExecutionContext,
+  supabase: any
+) {
+  console.log('Executing News Monitor node:', node.data.label);
+  
+  try {
+    const { symbol } = node.data.config;
+    
+    const { data, error } = await supabase.functions.invoke('api-connector', {
+      body: {
+        provider: 'finnhub',
+        action: 'news',
+        params: { symbol }
+      }
+    });
+    
+    if (error) throw error;
+    
+    const news = data || [];
+    
+    const result = {
+      symbol: symbol,
+      newsCount: news.length,
+      news: news.slice(0, 10), // Keep only top 10
+      timestamp: new Date().toISOString()
+    };
+    
+    return result;
+  } catch (error: any) {
+    console.error('News monitor fetch error:', error);
+    throw error;
+  }
+}
+
+// Fundamental Analysis Node - Fetch company fundamentals
+async function executeFundamentalAnalysis(
+  node: WorkflowNode,
+  context: ExecutionContext,
+  supabase: any
+) {
+  console.log('Executing Fundamental Analysis node:', node.data.label);
+  
+  try {
+    const { symbol } = node.data.config;
+    
+    // Fetch both company profile and basic financials
+    const [profileResponse, financialsResponse] = await Promise.all([
+      supabase.functions.invoke('api-connector', {
+        body: {
+          provider: 'finnhub',
+          action: 'company-profile',
+          params: { symbol }
+        }
+      }),
+      supabase.functions.invoke('api-connector', {
+        body: {
+          provider: 'finnhub',
+          action: 'basic-financials',
+          params: { symbol }
+        }
+      })
+    ]);
+    
+    if (profileResponse.error) throw profileResponse.error;
+    if (financialsResponse.error) throw financialsResponse.error;
+    
+    const result = {
+      symbol: symbol,
+      profile: profileResponse.data,
+      financials: financialsResponse.data,
+      timestamp: new Date().toISOString()
+    };
+    
+    return result;
+  } catch (error: any) {
+    console.error('Fundamental analysis fetch error:', error);
     throw error;
   }
 }
