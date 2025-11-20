@@ -19,7 +19,7 @@ import { NodeLibrary } from '@/components/workflow/NodeLibrary';
 import { NodeConfigPanel } from '@/components/workflow/NodeConfigPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Save, Play, ArrowLeft } from 'lucide-react';
+import { Save, Play, ArrowLeft, Sparkles } from 'lucide-react';
 import { NodeType, AgentNodeData, NODE_DEFINITIONS } from '@/types/workflow';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkflowExecution } from '@/hooks/useWorkflowExecution';
@@ -247,6 +247,165 @@ const AgentBuilderContent = () => {
     }
   };
 
+  const loadDemoWorkflow = () => {
+    const demoNodes: Node[] = [
+      {
+        id: 'demo-1',
+        type: 'schedule-trigger',
+        position: { x: 100, y: 50 },
+        data: {
+          type: 'schedule-trigger',
+          label: 'Schedule Trigger',
+          config: {
+            cronExpression: '0 * * * *',
+            timezone: 'UTC',
+            description: 'Runs every hour',
+          },
+        },
+      },
+      {
+        id: 'demo-2',
+        type: 'market-data',
+        position: { x: 100, y: 200 },
+        data: {
+          type: 'market-data',
+          label: 'Market Data',
+          config: {
+            symbols: ['BTC/USDT', 'ETH/USDT'],
+            timeframe: '1h',
+          },
+        },
+      },
+      {
+        id: 'demo-3',
+        type: 'technical-indicators',
+        position: { x: 100, y: 350 },
+        data: {
+          type: 'technical-indicators',
+          label: 'Technical Indicators',
+          config: {
+            symbol: 'BTC/USDT',
+            indicator: 'RSI',
+            interval: '1h',
+            time_period: 14,
+          },
+        },
+      },
+      {
+        id: 'demo-4',
+        type: 'sentiment-analysis',
+        position: { x: 450, y: 200 },
+        data: {
+          type: 'sentiment-analysis',
+          label: 'Sentiment Analysis',
+          config: {
+            symbol: 'BTC',
+            source: 'stocktwits',
+            lookbackPeriod: 24,
+            threshold: 0.5,
+          },
+        },
+      },
+      {
+        id: 'demo-5',
+        type: 'news-monitor',
+        position: { x: 450, y: 350 },
+        data: {
+          type: 'news-monitor',
+          label: 'News Monitor',
+          config: {
+            keywords: ['Bitcoin', 'BTC', 'cryptocurrency'],
+            sources: ['all'],
+            lookbackHours: 24,
+            sentimentFilter: 'all',
+          },
+        },
+      },
+      {
+        id: 'demo-6',
+        type: 'ai-risk-assessment',
+        position: { x: 275, y: 500 },
+        data: {
+          type: 'ai-risk-assessment',
+          label: 'AI Risk Assessment',
+          config: {
+            model: 'google/gemini-2.5-flash',
+            riskTolerance: 'moderate',
+            confidenceThreshold: 70,
+            customPrompt: 'Analyze technical indicators, sentiment, and news to assess trading risk. Focus on BTC/USDT trading opportunities.',
+          },
+        },
+      },
+      {
+        id: 'demo-7',
+        type: 'if-condition',
+        position: { x: 275, y: 680 },
+        data: {
+          type: 'if-condition',
+          label: 'Trading Condition',
+          config: {
+            conditions: [
+              { field: 'riskScore', operator: '<', value: '30' },
+              { field: 'sentiment', operator: '>', value: '0.5' },
+            ],
+            logic: 'AND',
+          },
+        },
+      },
+      {
+        id: 'demo-8',
+        type: 'execute-trade',
+        position: { x: 275, y: 830 },
+        data: {
+          type: 'execute-trade',
+          label: 'Execute Trade',
+          config: {
+            action: 'buy',
+            symbol: 'BTC/USDT',
+            amount: 0.001,
+            orderType: 'market',
+          },
+        },
+      },
+      {
+        id: 'demo-9',
+        type: 'send-alert',
+        position: { x: 275, y: 980 },
+        data: {
+          type: 'send-alert',
+          label: 'Send Alert',
+          config: {
+            alertType: 'trade_executed',
+            message: 'Demo strategy executed a BTC buy trade',
+            severity: 'info',
+          },
+        },
+      },
+    ];
+
+    const demoEdges: Edge[] = [
+      { id: 'e1-2', source: 'demo-1', target: 'demo-2', animated: true },
+      { id: 'e2-3', source: 'demo-2', target: 'demo-3', animated: true },
+      { id: 'e2-4', source: 'demo-2', target: 'demo-4', animated: true },
+      { id: 'e2-5', source: 'demo-2', target: 'demo-5', animated: true },
+      { id: 'e3-6', source: 'demo-3', target: 'demo-6', animated: true },
+      { id: 'e4-6', source: 'demo-4', target: 'demo-6', animated: true },
+      { id: 'e5-6', source: 'demo-5', target: 'demo-6', animated: true },
+      { id: 'e6-7', source: 'demo-6', target: 'demo-7', animated: true },
+      { id: 'e7-8', source: 'demo-7', target: 'demo-8', animated: true, label: 'true' },
+      { id: 'e8-9', source: 'demo-8', target: 'demo-9', animated: true },
+    ];
+
+    setNodes(demoNodes);
+    setEdges(demoEdges);
+    setWorkflowName('Demo: BTC Trading Strategy');
+    
+    toast({
+      title: "Demo Loaded",
+      description: "Example workflow with all investment analysis nodes loaded",
+    });
+  };
+
   return (
     <div className="flex flex-col h-screen bg-background">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
@@ -266,6 +425,14 @@ const AgentBuilderContent = () => {
           />
         </div>
         <div className="flex items-center gap-2">
+          <Button 
+            variant="secondary" 
+            size="sm" 
+            onClick={loadDemoWorkflow}
+          >
+            <Sparkles className="w-4 h-4 mr-2" />
+            Load Demo
+          </Button>
           <Button 
             variant="outline" 
             size="sm" 
