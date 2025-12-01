@@ -427,6 +427,73 @@ Respond in JSON format.`;
   }
 }
 
+// Helper function to select optimal exchange based on fees, liquidity, and trading pairs
+async function selectOptimalExchange(connections: any[], symbol: string, quantity: number, side: string): Promise<any> {
+  if (connections.length === 1) {
+    return connections[0];
+  }
+  
+  console.log(`Analyzing ${connections.length} exchanges for optimal trade execution`);
+  
+  const ccxtLib = await import('https://esm.sh/ccxt@4.2.25');
+  const exchangeScores: Array<{ connection: any; score: number; details: any }> = [];
+  
+  for (const connection of connections) {
+    try {
+      const ExchangeClass = (ccxtLib as any)[connection.exchange_name.toLowerCase()];
+      if (!ExchangeClass) continue;
+      
+      const exchange = new ExchangeClass({
+        apiKey: connection.api_key_encrypted,
+        secret: connection.api_secret_encrypted,
+        enableRateLimit: true,
+      });
+      
+      // Fetch market info
+      const ticker = await exchange.fetchTicker(symbol);
+      const orderbook = await exchange.fetchOrderBook(symbol);
+      
+      // Calculate metrics
+      const fees = exchange.fees?.trading?.taker || 0.001;
+      const spread = ((ticker.ask - ticker.bid) / ticker.last) * 100;
+      const liquidity = orderbook.bids.slice(0, 10).reduce((sum: number, bid: any) => sum + bid[1], 0);
+      
+      // Score calculation (lower is better)
+      // 40% fees, 30% spread, 30% liquidity (inverted)
+      const feeScore = fees * 1000 * 0.4;
+      const spreadScore = spread * 0.3;
+      const liquidityScore = (1 / Math.max(liquidity, 1)) * 1000 * 0.3;
+      const totalScore = feeScore + spreadScore + liquidityScore;
+      
+      exchangeScores.push({
+        connection,
+        score: totalScore,
+        details: {
+          fees,
+          spread: spread.toFixed(2) + '%',
+          liquidity: liquidity.toFixed(2),
+          estimatedCost: quantity * ticker.last * fees
+        }
+      });
+      
+      console.log(`Exchange ${connection.exchange_name}: score=${totalScore.toFixed(2)}, fees=${fees}, spread=${spread.toFixed(2)}%, liquidity=${liquidity.toFixed(2)}`);
+    } catch (error) {
+      console.error(`Failed to analyze ${connection.exchange_name}:`, error);
+    }
+  }
+  
+  if (exchangeScores.length === 0) {
+    return connections[0]; // Fallback to first connection
+  }
+  
+  // Select exchange with lowest score (best optimization)
+  exchangeScores.sort((a, b) => a.score - b.score);
+  const optimal = exchangeScores[0];
+  
+  console.log(`Selected ${optimal.connection.exchange_name} as optimal exchange:`, optimal.details);
+  return optimal.connection;
+}
+
 async function executeTradeNode(
   node: WorkflowNode,
   context: ExecutionContext,
@@ -439,27 +506,28 @@ async function executeTradeNode(
     const symbol = node.data.config?.symbol || context.nodeOutputs.get('market-data')?.symbol || 'BTC/USDT';
     const side = node.data.config?.side || 'buy'; // 'buy' or 'sell'
     const orderType = node.data.config?.orderType || 'market'; // 'market' or 'limit'
-    const quantity = node.data.config?.quantity || 0.001;
+    let quantity = node.data.config?.quantity || 0.001;
     const isPaperTrading = node.data.config?.isPaperTrading !== false; // Default to paper trading
     
     let price = node.data.config?.price || context.nodeOutputs.get('market-data')?.price || 0;
     let exchangeOrderId = null;
+    let exchangeOptimization = null;
     
-    // If live trading, execute via CCXT
+    // If live trading, execute via CCXT with exchange-specific optimization
     if (!isPaperTrading) {
       // Get user's exchange connection
       const { data: connections } = await supabase
         .from('exchange_connections')
         .select('*')
         .eq('user_id', context.userId)
-        .eq('is_active', true)
-        .limit(1);
+        .eq('is_active', true);
       
       if (!connections || connections.length === 0) {
         throw new Error('No active exchange connection found');
       }
       
-      const connection = connections[0];
+      // Exchange-specific optimization: Select best exchange for this trade
+      const connection = await selectOptimalExchange(connections, symbol, quantity, side);
       
       // Import CCXT
       const ccxtLib = await import('https://esm.sh/ccxt@4.2.25');
@@ -476,27 +544,46 @@ async function executeTradeNode(
         enableRateLimit: true,
       });
       
+      // Fetch exchange-specific data for optimization
+      const ticker = await exchange.fetchTicker(symbol);
+      const orderbook = await exchange.fetchOrderBook(symbol);
+      
+      // Calculate exchange-specific optimization
+      exchangeOptimization = {
+        exchange: connection.exchange_name,
+        fees: exchange.fees?.trading || { maker: 0.001, taker: 0.001 },
+        spread: ticker.ask - ticker.bid,
+        liquidity: orderbook.bids.slice(0, 10).reduce((sum: number, bid: any) => sum + bid[1], 0),
+        estimatedFee: quantity * price * (exchange.fees?.trading?.taker || 0.001)
+      };
+      
+      // Adjust quantity based on fees to ensure profitability
+      const adjustedQuantity = quantity * (1 - exchangeOptimization.fees.taker);
+      console.log('Exchange optimization:', exchangeOptimization);
+      console.log(`Adjusted quantity from ${quantity} to ${adjustedQuantity} to account for fees`);
+      
       // Check balance before trading
       const balance = await exchange.fetchBalance();
       const [base, quote] = symbol.split('/');
       
       if (side === 'buy') {
-        const requiredBalance = quantity * price;
+        const requiredBalance = adjustedQuantity * price;
         if (!balance[quote] || balance[quote].free < requiredBalance) {
           throw new Error(`Insufficient ${quote} balance`);
         }
       } else {
-        if (!balance[base] || balance[base].free < quantity) {
+        if (!balance[base] || balance[base].free < adjustedQuantity) {
           throw new Error(`Insufficient ${base} balance`);
         }
       }
       
-      // Place order
-      const order = await exchange.createOrder(symbol, orderType, side, quantity, orderType === 'limit' ? price : undefined);
+      // Place order with optimized parameters
+      const order = await exchange.createOrder(symbol, orderType, side, adjustedQuantity, orderType === 'limit' ? price : undefined);
       exchangeOrderId = order.id;
       price = order.price || price;
+      quantity = adjustedQuantity;
       
-      console.log('Live trade executed:', order);
+      console.log('Live trade executed with optimization:', order);
     }
 
     // Record transaction
@@ -566,6 +653,7 @@ async function executeTradeNode(
       totalValue: quantity * price,
       isPaperTrading,
       exchangeOrderId,
+      exchangeOptimization,
     };
 
     return { success: true, trade: tradeData };
