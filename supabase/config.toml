@@ -14,3 +14,9 @@ verify_jwt = true
 
 [functions.api-connector]
 verify_jwt = true
+
+[functions.ai-workflow-generator]
+verify_jwt = true
+
+[functions.market-context-analyzer]
+verify_jwt = true

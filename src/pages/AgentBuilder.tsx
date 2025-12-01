@@ -17,6 +17,7 @@ import '@xyflow/react/dist/style.css';
 import { CustomNode } from '@/components/workflow/CustomNode';
 import { NodeLibrary } from '@/components/workflow/NodeLibrary';
 import { NodeConfigPanel } from '@/components/workflow/NodeConfigPanel';
+import { AIWorkflowGenerator } from '@/components/workflow/AIWorkflowGenerator';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Save, Play, ArrowLeft, Sparkles } from 'lucide-react';
@@ -425,6 +426,12 @@ const AgentBuilderContent = () => {
           />
         </div>
         <div className="flex items-center gap-2">
+          <AIWorkflowGenerator 
+            onWorkflowGenerated={(workflow) => {
+              setNodes(workflow.nodes);
+              setEdges(workflow.edges);
+            }}
+          />
           <Button 
             variant="secondary" 
             size="sm" 
