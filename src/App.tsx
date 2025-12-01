@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import AgentBuilder from "./pages/AgentBuilder";
+import MyAgents from "./pages/MyAgents";
 import ExchangeConnections from "./pages/ExchangeConnections";
 import Portfolio from "./pages/Portfolio";
 import NotFound from "./pages/NotFound";
@@ -23,6 +24,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/my-agents" element={<MyAgents />} />
           <Route path="/agent-builder" element={<AgentBuilder />} />
           <Route path="/agent-builder/:id" element={<AgentBuilder />} />
           <Route path="/exchange-connections" element={<ExchangeConnections />} />

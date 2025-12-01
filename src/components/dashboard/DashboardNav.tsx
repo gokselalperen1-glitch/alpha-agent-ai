@@ -29,7 +29,7 @@ export const DashboardNav = ({ user }: DashboardNavProps) => {
                 <LayoutDashboard className="h-4 w-4" />
                 Overview
               </Button>
-              <Button variant="ghost" size="sm" className="gap-2" onClick={() => navigate('/agent-builder')}>
+              <Button variant="ghost" size="sm" className="gap-2" onClick={() => navigate('/my-agents')}>
                 <Bot className="h-4 w-4" />
                 My Agents
               </Button>
