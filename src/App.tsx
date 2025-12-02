@@ -9,6 +9,7 @@ import Dashboard from "./pages/Dashboard";
 import AgentBuilder from "./pages/AgentBuilder";
 import MyAgents from "./pages/MyAgents";
 import ExchangeConnections from "./pages/ExchangeConnections";
+import APIKeysManagement from "./pages/APIKeysManagement";
 import Portfolio from "./pages/Portfolio";
 import NotFound from "./pages/NotFound";
 
@@ -28,6 +29,7 @@ const App = () => (
           <Route path="/agent-builder" element={<AgentBuilder />} />
           <Route path="/agent-builder/:id" element={<AgentBuilder />} />
           <Route path="/exchange-connections" element={<ExchangeConnections />} />
+          <Route path="/api-keys" element={<APIKeysManagement />} />
           <Route path="/portfolio" element={<Portfolio />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

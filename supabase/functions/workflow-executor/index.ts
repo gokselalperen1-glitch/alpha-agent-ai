@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { SAFETY_RULES } from "../_shared/exchange-config.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -513,6 +514,86 @@ async function executeTradeNode(
     let exchangeOrderId = null;
     let exchangeOptimization = null;
     
+    // PRE-TRADE SAFETY VALIDATION
+    if (!isPaperTrading) {
+      console.log('Performing pre-trade safety checks...');
+      
+      // Check 1: Get user's portfolio to validate position size
+      const { data: portfolios } = await supabase
+        .from('portfolios')
+        .select('*')
+        .eq('user_id', context.userId);
+      
+      const totalPortfolioValue = portfolios?.reduce((sum: number, p: any) => 
+        sum + (p.current_value || 0), 0) || 0;
+      
+      const tradeValue = quantity * price;
+      const tradePercent = totalPortfolioValue > 0 
+        ? (tradeValue / totalPortfolioValue) * 100 
+        : 0;
+      
+      if (tradePercent > SAFETY_RULES.maxSingleTradePercent) {
+        throw new Error(
+          `Trade size ${tradePercent.toFixed(2)}% exceeds maximum allowed ${SAFETY_RULES.maxSingleTradePercent}% per trade`
+        );
+      }
+      
+      // Check 2: Daily trade count limit
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const { data: todayTrades, error: tradeCountError } = await supabase
+        .from('transactions')
+        .select('id')
+        .eq('user_id', context.userId)
+        .eq('agent_id', context.agentId)
+        .gte('executed_at', today.toISOString());
+      
+      if (todayTrades && todayTrades.length >= SAFETY_RULES.maxDailyTrades) {
+        throw new Error(
+          `Daily trade limit reached (${SAFETY_RULES.maxDailyTrades} trades). Try again tomorrow.`
+        );
+      }
+      
+      // Check 3: Require paper trading first
+      if (SAFETY_RULES.requirePaperTradingFirst) {
+        const { data: paperTrades } = await supabase
+          .from('transactions')
+          .select('id')
+          .eq('user_id', context.userId)
+          .eq('agent_id', context.agentId)
+          .eq('is_paper_trade', true);
+        
+        if (!paperTrades || paperTrades.length < SAFETY_RULES.minPaperTradesRequired) {
+          throw new Error(
+            `Agent requires at least ${SAFETY_RULES.minPaperTradesRequired} successful paper trades before live trading. Current: ${paperTrades?.length || 0}`
+          );
+        }
+      }
+      
+      // Check 4: Health check on exchange connection
+      const { data: connections } = await supabase
+        .from('exchange_connections')
+        .select('*')
+        .eq('user_id', context.userId)
+        .eq('is_active', true);
+      
+      if (!connections || connections.length === 0) {
+        throw new Error('No active exchange connection found');
+      }
+      
+      // Verify connection health and permissions
+      const healthyConnections = connections.filter((c: any) => 
+        c.health_status === 'healthy' && c.permissions?.trade === true
+      );
+      
+      if (healthyConnections.length === 0) {
+        throw new Error('No healthy exchange connections with trading permissions found');
+      }
+      
+      console.log('✓ All safety checks passed');
+    }
+    
     // If live trading, execute via CCXT with exchange-specific optimization
     if (!isPaperTrading) {
       // Get user's exchange connection
@@ -520,7 +601,8 @@ async function executeTradeNode(
         .from('exchange_connections')
         .select('*')
         .eq('user_id', context.userId)
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .eq('health_status', 'healthy');
       
       if (!connections || connections.length === 0) {
         throw new Error('No active exchange connection found');

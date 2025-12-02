@@ -8,22 +8,34 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, Plus, CheckCircle, XCircle } from "lucide-react";
+import { Trash2, Plus, CheckCircle, XCircle, AlertTriangle, Clock, Key } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 
 interface ExchangeConnection {
   id: string;
   exchange_name: string;
   is_active: boolean;
+  is_testnet: boolean;
+  health_status: string;
+  last_health_check: string | null;
+  permissions: {
+    read: boolean;
+    trade: boolean;
+    withdraw: boolean;
+  };
   created_at: string;
 }
 
 const SUPPORTED_EXCHANGES = [
-  { value: 'binance', label: 'Binance' },
-  { value: 'coinbase', label: 'Coinbase' },
-  { value: 'kraken', label: 'Kraken' },
-  { value: 'bybit', label: 'Bybit' },
+  { value: 'binance', label: 'Binance', requiresPassphrase: false },
+  { value: 'coinbase', label: 'Coinbase', requiresPassphrase: true },
+  { value: 'kraken', label: 'Kraken', requiresPassphrase: false },
+  { value: 'bybit', label: 'Bybit', requiresPassphrase: false },
+  { value: 'kucoin', label: 'KuCoin', requiresPassphrase: true },
+  { value: 'okx', label: 'OKX', requiresPassphrase: true },
 ];
 
 const ExchangeConnections = () => {
@@ -40,7 +52,11 @@ const ExchangeConnections = () => {
     exchangeName: '',
     apiKey: '',
     apiSecret: '',
+    passphrase: '',
+    isTestnet: false,
   });
+
+  const selectedExchange = SUPPORTED_EXCHANGES.find(ex => ex.value === formData.exchangeName);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -73,7 +89,16 @@ const ExchangeConnections = () => {
     if (!formData.exchangeName || !formData.apiKey || !formData.apiSecret) {
       toast({
         title: 'Missing Information',
-        description: 'Please fill in all fields',
+        description: 'Please fill in all required fields',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (selectedExchange?.requiresPassphrase && !formData.passphrase) {
+      toast({
+        title: 'Passphrase Required',
+        description: `${selectedExchange.label} requires a passphrase`,
         variant: 'destructive',
       });
       return;
@@ -87,6 +112,8 @@ const ExchangeConnections = () => {
           exchangeName: formData.exchangeName,
           apiKey: formData.apiKey,
           apiSecret: formData.apiSecret,
+          passphrase: formData.passphrase || undefined,
+          isTestnet: formData.isTestnet,
         },
       });
 
@@ -94,9 +121,14 @@ const ExchangeConnections = () => {
         throw new Error(data?.error || 'Connection test failed');
       }
 
+      const permissions = data.data.permissions;
+      const permissionText = permissions.trade 
+        ? 'with trading permissions' 
+        : 'with read-only permissions';
+
       toast({
         title: 'Connection Successful',
-        description: `Found ${data.data.availableMarkets.length} markets`,
+        description: `Found ${data.data.availableMarkets.length} markets ${permissionText}`,
       });
     } catch (error: any) {
       toast({
@@ -118,6 +150,8 @@ const ExchangeConnections = () => {
           exchangeName: formData.exchangeName,
           apiKey: formData.apiKey,
           apiSecret: formData.apiSecret,
+          passphrase: formData.passphrase || undefined,
+          isTestnet: formData.isTestnet,
         },
       });
 
@@ -131,7 +165,7 @@ const ExchangeConnections = () => {
       });
 
       setIsDialogOpen(false);
-      setFormData({ exchangeName: '', apiKey: '', apiSecret: '' });
+      setFormData({ exchangeName: '', apiKey: '', apiSecret: '', passphrase: '', isTestnet: false });
       loadConnections();
     } catch (error: any) {
       toast({
@@ -145,6 +179,8 @@ const ExchangeConnections = () => {
   };
 
   const handleDelete = async (connectionId: string) => {
+    if (!confirm('Are you sure you want to delete this connection?')) return;
+
     try {
       const { data, error } = await supabase.functions.invoke('manage-exchange-connection', {
         body: {
@@ -172,6 +208,38 @@ const ExchangeConnections = () => {
     }
   };
 
+  const getHealthStatusIcon = (status: string) => {
+    switch (status) {
+      case 'healthy':
+        return <CheckCircle className="h-5 w-5 text-green-500" />;
+      case 'auth_failed':
+      case 'error':
+        return <XCircle className="h-5 w-5 text-destructive" />;
+      case 'rate_limited':
+      case 'network_error':
+        return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
+      default:
+        return <Clock className="h-5 w-5 text-muted-foreground" />;
+    }
+  };
+
+  const getHealthStatusText = (status: string) => {
+    switch (status) {
+      case 'healthy':
+        return 'Healthy';
+      case 'auth_failed':
+        return 'Auth Failed';
+      case 'rate_limited':
+        return 'Rate Limited';
+      case 'network_error':
+        return 'Network Error';
+      case 'error':
+        return 'Error';
+      default:
+        return 'Unknown';
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -189,65 +257,101 @@ const ExchangeConnections = () => {
             <h1 className="text-3xl font-bold text-foreground">Exchange Connections</h1>
             <p className="text-muted-foreground mt-2">Connect your cryptocurrency exchange accounts for live trading</p>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Connection
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Connect Exchange</DialogTitle>
-                <DialogDescription>
-                  Add your exchange API credentials. Your keys are encrypted and stored securely.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="exchange">Exchange</Label>
-                  <Select value={formData.exchangeName} onValueChange={(value) => setFormData({ ...formData, exchangeName: value })}>
-                    <SelectTrigger id="exchange">
-                      <SelectValue placeholder="Select exchange" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SUPPORTED_EXCHANGES.map(ex => (
-                        <SelectItem key={ex.value} value={ex.value}>{ex.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => navigate('/api-keys')}>
+              <Key className="mr-2 h-4 w-4" />
+              Manage API Keys
+            </Button>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Connection
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Connect Exchange</DialogTitle>
+                  <DialogDescription>
+                    Add your exchange API credentials. Your keys are encrypted and stored securely.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="exchange">Exchange</Label>
+                    <Select 
+                      value={formData.exchangeName} 
+                      onValueChange={(value) => setFormData({ 
+                        ...formData, 
+                        exchangeName: value,
+                        passphrase: '' // Reset passphrase when changing exchange
+                      })}
+                    >
+                      <SelectTrigger id="exchange">
+                        <SelectValue placeholder="Select exchange" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SUPPORTED_EXCHANGES.map(ex => (
+                          <SelectItem key={ex.value} value={ex.value}>
+                            {ex.label}
+                            {ex.requiresPassphrase && <span className="text-xs text-muted-foreground ml-2">(requires passphrase)</span>}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="apiKey">API Key</Label>
+                    <Input
+                      id="apiKey"
+                      type="password"
+                      value={formData.apiKey}
+                      onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
+                      placeholder="Enter API key"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="apiSecret">API Secret</Label>
+                    <Input
+                      id="apiSecret"
+                      type="password"
+                      value={formData.apiSecret}
+                      onChange={(e) => setFormData({ ...formData, apiSecret: e.target.value })}
+                      placeholder="Enter API secret"
+                    />
+                  </div>
+                  {selectedExchange?.requiresPassphrase && (
+                    <div className="space-y-2">
+                      <Label htmlFor="passphrase">Passphrase</Label>
+                      <Input
+                        id="passphrase"
+                        type="password"
+                        value={formData.passphrase}
+                        onChange={(e) => setFormData({ ...formData, passphrase: e.target.value })}
+                        placeholder="Enter passphrase"
+                      />
+                    </div>
+                  )}
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="testnet"
+                      checked={formData.isTestnet}
+                      onCheckedChange={(checked) => setFormData({ ...formData, isTestnet: checked })}
+                    />
+                    <Label htmlFor="testnet">Use Testnet (recommended for testing)</Label>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={handleTest} disabled={isTesting} variant="outline" className="flex-1">
+                      {isTesting ? 'Testing...' : 'Test Connection'}
+                    </Button>
+                    <Button onClick={handleSave} disabled={isSaving} className="flex-1">
+                      {isSaving ? 'Saving...' : 'Save Connection'}
+                    </Button>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="apiKey">API Key</Label>
-                  <Input
-                    id="apiKey"
-                    type="password"
-                    value={formData.apiKey}
-                    onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
-                    placeholder="Enter API key"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="apiSecret">API Secret</Label>
-                  <Input
-                    id="apiSecret"
-                    type="password"
-                    value={formData.apiSecret}
-                    onChange={(e) => setFormData({ ...formData, apiSecret: e.target.value })}
-                    placeholder="Enter API secret"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <Button onClick={handleTest} disabled={isTesting} variant="outline" className="flex-1">
-                    {isTesting ? 'Testing...' : 'Test Connection'}
-                  </Button>
-                  <Button onClick={handleSave} disabled={isSaving} className="flex-1">
-                    {isSaving ? 'Saving...' : 'Save Connection'}
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
         {connections.length === 0 ? (
@@ -267,17 +371,31 @@ const ExchangeConnections = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
                     <span className="capitalize">{connection.exchange_name}</span>
-                    {connection.is_active ? (
-                      <CheckCircle className="h-5 w-5 text-green-500" />
-                    ) : (
-                      <XCircle className="h-5 w-5 text-red-500" />
-                    )}
+                    {getHealthStatusIcon(connection.health_status)}
                   </CardTitle>
                   <CardDescription>
                     Connected on {new Date(connection.created_at).toLocaleDateString()}
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    {connection.is_testnet && (
+                      <Badge variant="outline">Testnet</Badge>
+                    )}
+                    <Badge variant={connection.health_status === 'healthy' ? 'default' : 'destructive'}>
+                      {getHealthStatusText(connection.health_status)}
+                    </Badge>
+                    {connection.permissions.trade ? (
+                      <Badge variant="default">Trading Enabled</Badge>
+                    ) : (
+                      <Badge variant="secondary">Read Only</Badge>
+                    )}
+                  </div>
+                  {connection.last_health_check && (
+                    <p className="text-xs text-muted-foreground">
+                      Last checked: {new Date(connection.last_health_check).toLocaleString()}
+                    </p>
+                  )}
                   <Button
                     variant="destructive"
                     size="sm"
