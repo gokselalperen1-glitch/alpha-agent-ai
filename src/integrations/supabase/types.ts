@@ -91,14 +91,57 @@ export type Database = {
           },
         ]
       }
+      api_provider_keys: {
+        Row: {
+          api_key_encrypted: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          provider: string
+          rate_limit_remaining: number | null
+          rate_limit_reset_at: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          api_key_encrypted: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          provider: string
+          rate_limit_remaining?: number | null
+          rate_limit_reset_at?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          api_key_encrypted?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          provider?: string
+          rate_limit_remaining?: number | null
+          rate_limit_reset_at?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       exchange_connections: {
         Row: {
           api_key_encrypted: string
           api_secret_encrypted: string
           created_at: string
           exchange_name: string
+          health_status: string | null
           id: string
           is_active: boolean
+          is_testnet: boolean | null
+          last_health_check: string | null
+          passphrase_encrypted: string | null
+          permissions: Json | null
+          rate_limit_config: Json | null
+          supported_pairs: string[] | null
           updated_at: string
           user_id: string
         }
@@ -107,8 +150,15 @@ export type Database = {
           api_secret_encrypted: string
           created_at?: string
           exchange_name: string
+          health_status?: string | null
           id?: string
           is_active?: boolean
+          is_testnet?: boolean | null
+          last_health_check?: string | null
+          passphrase_encrypted?: string | null
+          permissions?: Json | null
+          rate_limit_config?: Json | null
+          supported_pairs?: string[] | null
           updated_at?: string
           user_id: string
         }
@@ -117,8 +167,15 @@ export type Database = {
           api_secret_encrypted?: string
           created_at?: string
           exchange_name?: string
+          health_status?: string | null
           id?: string
           is_active?: boolean
+          is_testnet?: boolean | null
+          last_health_check?: string | null
+          passphrase_encrypted?: string | null
+          permissions?: Json | null
+          rate_limit_config?: Json | null
+          supported_pairs?: string[] | null
           updated_at?: string
           user_id?: string
         }
