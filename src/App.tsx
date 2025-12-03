@@ -11,6 +11,7 @@ import MyAgents from "./pages/MyAgents";
 import ExchangeConnections from "./pages/ExchangeConnections";
 import APIKeysManagement from "./pages/APIKeysManagement";
 import Portfolio from "./pages/Portfolio";
+import AgentStudio from "./pages/AgentStudio";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,6 +32,7 @@ const App = () => (
           <Route path="/exchange-connections" element={<ExchangeConnections />} />
           <Route path="/api-keys" element={<APIKeysManagement />} />
           <Route path="/portfolio" element={<Portfolio />} />
+          <Route path="/agent-studio" element={<AgentStudio />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
