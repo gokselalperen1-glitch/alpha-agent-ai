@@ -23,3 +23,6 @@ verify_jwt = true
 
 [functions.exchange-health-check]
 verify_jwt = false
+
+[functions.sync-portfolio]
+verify_jwt = true
