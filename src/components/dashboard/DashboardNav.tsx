@@ -2,7 +2,7 @@ import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { LogOut, Bot, LayoutDashboard, Wallet, Settings } from "lucide-react";
+import { LogOut, Bot, LayoutDashboard, Wallet, Settings, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 interface DashboardNavProps {
@@ -28,6 +28,10 @@ export const DashboardNav = ({ user }: DashboardNavProps) => {
               <Button variant="ghost" size="sm" className="gap-2" onClick={() => navigate('/dashboard')}>
                 <LayoutDashboard className="h-4 w-4" />
                 Overview
+              </Button>
+              <Button variant="ghost" size="sm" className="gap-2" onClick={() => navigate('/agent-studio')}>
+                <Sparkles className="h-4 w-4" />
+                Agent Studio
               </Button>
               <Button variant="ghost" size="sm" className="gap-2" onClick={() => navigate('/my-agents')}>
                 <Bot className="h-4 w-4" />
