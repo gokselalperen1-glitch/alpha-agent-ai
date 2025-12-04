@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, TrendingDown, Wallet, RefreshCw, Link2, Clock } from "lucide-react";
 import { usePortfolioSync } from "@/hooks/usePortfolioSync";
+import { LivePriceTicker } from "@/components/exchange/LivePriceTicker";
+import { RealtimePortfolioTracker } from "@/components/exchange/RealtimePortfolioTracker";
 
 interface Transaction {
   id: string;
@@ -28,9 +30,7 @@ const Portfolio = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
   const { 
-    portfolios, 
     connections, 
-    totalValue, 
     isSyncing, 
     lastSyncTime, 
     syncPortfolio 
@@ -69,14 +69,6 @@ const Portfolio = () => {
     );
   }
 
-  const calculatePnL = (portfolio: { average_buy_price: number | null; current_value: number | null; quantity: number }) => {
-    if (!portfolio.average_buy_price || !portfolio.current_value) return null;
-    const costBasis = portfolio.average_buy_price * portfolio.quantity;
-    const pnl = portfolio.current_value - costBasis;
-    const pnlPercent = (pnl / costBasis) * 100;
-    return { pnl, pnlPercent };
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <DashboardNav user={user} />
@@ -84,7 +76,7 @@ const Portfolio = () => {
         <div className="flex justify-between items-start mb-8">
           <div>
             <h1 className="text-3xl font-bold text-foreground">Portfolio</h1>
-            <p className="text-muted-foreground mt-2">Track your assets and trading performance</p>
+            <p className="text-muted-foreground mt-2">Track your assets and trading performance in real-time</p>
           </div>
           <div className="flex items-center gap-4">
             {lastSyncTime && (
@@ -102,6 +94,11 @@ const Portfolio = () => {
               {isSyncing ? 'Syncing...' : 'Sync Portfolio'}
             </Button>
           </div>
+        </div>
+
+        {/* Live Price Ticker */}
+        <div className="mb-8">
+          <LivePriceTicker />
         </div>
 
         {/* Connected Exchanges */}
@@ -149,81 +146,12 @@ const Portfolio = () => {
           </Card>
         )}
 
-        {/* Total Value Card */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Wallet className="h-5 w-5" />
-              Total Portfolio Value
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-4xl font-bold text-foreground">
-              ${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </p>
-            {portfolios.length > 0 && (
-              <p className="text-sm text-muted-foreground mt-2">
-                {portfolios.length} asset{portfolios.length !== 1 ? 's' : ''} across {connections.length} exchange{connections.length !== 1 ? 's' : ''}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Holdings Table */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Holdings</CardTitle>
-            <CardDescription>Your current asset positions</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {portfolios.length === 0 ? (
-              <p className="text-muted-foreground text-center py-8">No holdings yet. Start trading to build your portfolio.</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Asset</TableHead>
-                    <TableHead className="text-right">Quantity</TableHead>
-                    <TableHead className="text-right">Avg Price</TableHead>
-                    <TableHead className="text-right">Current Value</TableHead>
-                    <TableHead className="text-right">P&L</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {portfolios.map((portfolio) => {
-                    const pnl = calculatePnL(portfolio);
-                    return (
-                      <TableRow key={portfolio.id}>
-                        <TableCell className="font-medium">{portfolio.asset_symbol}</TableCell>
-                        <TableCell className="text-right">{portfolio.quantity.toFixed(8)}</TableCell>
-                        <TableCell className="text-right">
-                          ${portfolio.average_buy_price?.toFixed(2) || '-'}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          ${portfolio.current_value?.toFixed(2) || '-'}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {pnl ? (
-                            <div className="flex items-center justify-end gap-1">
-                              {pnl.pnl >= 0 ? (
-                                <TrendingUp className="h-4 w-4 text-green-500" />
-                              ) : (
-                                <TrendingDown className="h-4 w-4 text-red-500" />
-                              )}
-                              <span className={pnl.pnl >= 0 ? 'text-green-500' : 'text-red-500'}>
-                                {pnl.pnlPercent.toFixed(2)}%
-                              </span>
-                            </div>
-                          ) : '-'}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+        {/* Real-time Portfolio Tracker */}
+        {user && (
+          <div className="mb-8">
+            <RealtimePortfolioTracker userId={user.id} />
+          </div>
+        )}
 
         {/* Transaction History */}
         <Card>
