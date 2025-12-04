@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.sync-portfolio]
 verify_jwt = true
+
+[functions.realtime-prices]
+verify_jwt = false
