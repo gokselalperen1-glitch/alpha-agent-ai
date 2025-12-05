@@ -13,18 +13,22 @@ interface MarketDataConfigProps {
 
 const TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h", "1d"];
 const POPULAR_SYMBOLS = ["BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "XRP/USDT"];
+const EXCHANGES = ["binance", "coinbase", "kraken", "bybit", "kucoin", "okx"];
 
 export const MarketDataConfig = ({ config, onUpdate }: MarketDataConfigProps) => {
   const [symbols, setSymbols] = useState<string[]>(config.symbols || []);
   const [inputValue, setInputValue] = useState("");
   const [timeframe, setTimeframe] = useState(config.timeframe || "1h");
+  const [exchange, setExchange] = useState(config.exchange || "binance");
 
   useEffect(() => {
     onUpdate({
       symbols,
+      symbol: symbols[0] || "BTC/USDT", // Also set single symbol for backwards compatibility
       timeframe,
+      exchange,
     });
-  }, [symbols, timeframe]);
+  }, [symbols, timeframe, exchange]);
 
   const addSymbol = (symbol: string) => {
     const formattedSymbol = symbol.toUpperCase().trim();
@@ -47,6 +51,26 @@ export const MarketDataConfig = ({ config, onUpdate }: MarketDataConfigProps) =>
 
   return (
     <div className="space-y-4">
+      {/* Exchange Selection */}
+      <div className="space-y-2">
+        <Label>Exchange</Label>
+        <Select value={exchange} onValueChange={setExchange}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {EXCHANGES.map((ex) => (
+              <SelectItem key={ex} value={ex}>
+                {ex.charAt(0).toUpperCase() + ex.slice(1)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          Data source for market prices
+        </p>
+      </div>
+
       <div className="space-y-2">
         <Label>Trading Pairs</Label>
         <Input
@@ -113,7 +137,7 @@ export const MarketDataConfig = ({ config, onUpdate }: MarketDataConfigProps) =>
       <div className="pt-4 border-t">
         <p className="text-xs text-muted-foreground">
           {symbols.length > 0
-            ? `Fetching ${timeframe} data for ${symbols.length} symbol${symbols.length > 1 ? 's' : ''}`
+            ? `Fetching ${timeframe} data from ${exchange.charAt(0).toUpperCase() + exchange.slice(1)} for ${symbols.length} symbol${symbols.length > 1 ? 's' : ''}`
             : "Add symbols to fetch market data"}
         </p>
       </div>
