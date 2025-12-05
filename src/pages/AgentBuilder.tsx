@@ -189,38 +189,76 @@ const AgentBuilderContent = () => {
           .select()
           .single();
 
-        if (agentError) throw agentError;
+        if (agentError) {
+          console.error('Agent creation error:', agentError);
+          throw agentError;
+        }
         agentId = agentData.id;
       } else {
         // Update agent name
-        await supabase
+        const { error: updateError } = await supabase
           .from('agents')
           .update({ name: workflowName })
           .eq('id', agentId);
+        
+        if (updateError) {
+          console.error('Agent update error:', updateError);
+        }
       }
 
-      // Then save the workflow
-      const workflow = {
-        agent_id: agentId,
-        nodes: nodes,
-        edges: edges,
-      };
-
-      const { error } = await supabase
+      // Check if workflow already exists for this agent
+      const { data: existingWorkflow, error: fetchError } = await supabase
         .from('workflows')
-        .upsert(workflow, { onConflict: 'agent_id' });
+        .select('id')
+        .eq('agent_id', agentId)
+        .maybeSingle();
 
-      if (error) throw error;
+      if (fetchError) {
+        console.error('Workflow fetch error:', fetchError);
+      }
+
+      // Save workflow - insert or update based on existence
+      if (existingWorkflow) {
+        // Update existing workflow
+        const { error: workflowError } = await supabase
+          .from('workflows')
+          .update({
+            nodes: nodes,
+            edges: edges,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingWorkflow.id);
+
+        if (workflowError) {
+          console.error('Workflow update error:', workflowError);
+          throw workflowError;
+        }
+      } else {
+        // Create new workflow
+        const { error: workflowError } = await supabase
+          .from('workflows')
+          .insert({
+            agent_id: agentId,
+            nodes: nodes,
+            edges: edges,
+          });
+
+        if (workflowError) {
+          console.error('Workflow insert error:', workflowError);
+          throw workflowError;
+        }
+      }
       
       toast({ 
         title: "Saved", 
-        description: id ? "Workflow updated successfully" : "Workflow created successfully" 
+        description: id ? "Workflow updated successfully" : "Agent created with workflow" 
       });
       
       if (!id) {
         navigate(`/agent-builder/${agentId}`);
       }
     } catch (error: any) {
+      console.error('Save error:', error);
       toast({
         title: "Error",
         description: error.message,
