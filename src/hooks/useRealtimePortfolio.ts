@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useRealtimePrices } from './useRealtimePrices';
 
@@ -29,17 +29,23 @@ export const useRealtimePortfolio = (userId: string | undefined) => {
   const [totalPnLPercent, setTotalPnLPercent] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  // Get unique symbols from portfolio for price subscription
-  const symbols = portfolioItems.map(p => `${p.asset_symbol.toLowerCase()}usdt`);
+  // Memoize symbols to prevent infinite re-renders
+  const symbols = useMemo(() => {
+    if (portfolioItems.length === 0) return ['btcusdt'];
+    return portfolioItems.map(p => `${p.asset_symbol.toLowerCase()}usdt`);
+  }, [portfolioItems]);
   
   const { prices, isConnected, getPrice } = useRealtimePrices({
-    symbols: symbols.length > 0 ? symbols : ['btcusdt'],
-    enabled: symbols.length > 0,
+    symbols,
+    enabled: true,
   });
 
   // Load portfolio items
   const loadPortfolio = useCallback(async () => {
-    if (!userId) return;
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
 
     const { data, error } = await supabase
       .from('portfolios')
@@ -59,7 +65,7 @@ export const useRealtimePortfolio = (userId: string | undefined) => {
     loadPortfolio();
 
     const channel = supabase
-      .channel('portfolio-realtime')
+      .channel(`portfolio-realtime-${userId}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -86,8 +92,8 @@ export const useRealtimePortfolio = (userId: string | undefined) => {
     }
 
     const updatedValues: RealtimePortfolioValue[] = portfolioItems.map(item => {
-      const symbolKey = `${item.asset_symbol.toLowerCase()}usdt`;
-      const priceData = getPrice(symbolKey.toUpperCase()) || getPrice(symbolKey);
+      const symbolKey = `${item.asset_symbol.toUpperCase()}USDT`;
+      const priceData = getPrice(symbolKey);
       
       const currentPrice = priceData?.price || item.current_value || 0;
       const currentValue = item.quantity * currentPrice;

@@ -1,5 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useToast } from '@/hooks/use-toast';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 
 interface PriceUpdate {
   exchange: string;
@@ -23,10 +22,15 @@ export const useRealtimePrices = (options: UseRealtimePricesOptions = {}) => {
   const [error, setError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const { toast } = useToast();
+  const mountedRef = useRef(true);
+
+  // Stabilize symbols array to prevent infinite reconnections
+  const symbolsKey = useMemo(() => symbols.join(','), [symbols]);
+  const stableSymbols = useMemo(() => symbols, [symbolsKey]);
 
   const connect = useCallback(() => {
-    if (!enabled || wsRef.current?.readyState === WebSocket.OPEN) return;
+    if (!enabled || !mountedRef.current) return;
+    if (wsRef.current?.readyState === WebSocket.OPEN || wsRef.current?.readyState === WebSocket.CONNECTING) return;
 
     const wsUrl = `wss://pqshhuhxvihsxyudcznx.functions.supabase.co/functions/v1/realtime-prices`;
     
@@ -35,6 +39,10 @@ export const useRealtimePrices = (options: UseRealtimePricesOptions = {}) => {
       wsRef.current = ws;
 
       ws.onopen = () => {
+        if (!mountedRef.current) {
+          ws.close();
+          return;
+        }
         console.log('Connected to real-time prices');
         setIsConnected(true);
         setError(null);
@@ -43,11 +51,12 @@ export const useRealtimePrices = (options: UseRealtimePricesOptions = {}) => {
         ws.send(JSON.stringify({
           type: 'subscribe',
           exchange,
-          symbols,
+          symbols: stableSymbols,
         }));
       };
 
       ws.onmessage = (event) => {
+        if (!mountedRef.current) return;
         try {
           const message = JSON.parse(event.data);
           
@@ -70,27 +79,35 @@ export const useRealtimePrices = (options: UseRealtimePricesOptions = {}) => {
 
       ws.onclose = () => {
         console.log('Disconnected from real-time prices');
-        setIsConnected(false);
-        wsRef.current = null;
-        
-        // Attempt to reconnect after 5 seconds
-        if (enabled) {
-          reconnectTimeoutRef.current = setTimeout(() => {
-            console.log('Attempting to reconnect...');
-            connect();
-          }, 5000);
+        if (mountedRef.current) {
+          setIsConnected(false);
+          wsRef.current = null;
+          
+          // Attempt to reconnect after 5 seconds
+          if (enabled && mountedRef.current) {
+            reconnectTimeoutRef.current = setTimeout(() => {
+              if (mountedRef.current) {
+                console.log('Attempting to reconnect...');
+                connect();
+              }
+            }, 5000);
+          }
         }
       };
 
       ws.onerror = (error) => {
         console.error('WebSocket error:', error);
-        setError('Connection error');
+        if (mountedRef.current) {
+          setError('Connection error');
+        }
       };
     } catch (error: any) {
       console.error('Failed to connect:', error);
-      setError(error.message);
+      if (mountedRef.current) {
+        setError(error.message);
+      }
     }
-  }, [enabled, exchange, symbols]);
+  }, [enabled, exchange, stableSymbols]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -99,8 +116,14 @@ export const useRealtimePrices = (options: UseRealtimePricesOptions = {}) => {
     }
     
     if (wsRef.current) {
-      wsRef.current.send(JSON.stringify({ type: 'unsubscribe' }));
-      wsRef.current.close();
+      try {
+        if (wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({ type: 'unsubscribe' }));
+        }
+        wsRef.current.close();
+      } catch (e) {
+        // Ignore errors during cleanup
+      }
       wsRef.current = null;
     }
     
@@ -108,6 +131,8 @@ export const useRealtimePrices = (options: UseRealtimePricesOptions = {}) => {
   }, []);
 
   useEffect(() => {
+    mountedRef.current = true;
+    
     if (enabled) {
       connect();
     } else {
@@ -115,14 +140,27 @@ export const useRealtimePrices = (options: UseRealtimePricesOptions = {}) => {
     }
 
     return () => {
+      mountedRef.current = false;
       disconnect();
     };
   }, [enabled, connect, disconnect]);
 
   // Helper to get price for a specific symbol
   const getPrice = useCallback((symbol: string, exch?: string): PriceUpdate | undefined => {
-    const key = `${exch || exchange}:${symbol}`;
-    return prices.get(key);
+    const targetExchange = exch || exchange;
+    // Try exact match first
+    const exactKey = `${targetExchange}:${symbol}`;
+    if (prices.has(exactKey)) {
+      return prices.get(exactKey);
+    }
+    // Try uppercase
+    const upperKey = `${targetExchange}:${symbol.toUpperCase()}`;
+    if (prices.has(upperKey)) {
+      return prices.get(upperKey);
+    }
+    // Try lowercase
+    const lowerKey = `${targetExchange}:${symbol.toLowerCase()}`;
+    return prices.get(lowerKey);
   }, [prices, exchange]);
 
   // Get all prices as array
