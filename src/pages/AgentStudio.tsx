@@ -36,6 +36,14 @@ interface ExecutionStats {
   running: number;
 }
 
+interface ExchangeConnection {
+  id: string;
+  exchange_name: string;
+  health_status: string | null;
+  is_testnet: boolean | null;
+  permissions: any;
+}
+
 const AgentStudio = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -45,6 +53,7 @@ const AgentStudio = () => {
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [executionStats, setExecutionStats] = useState<ExecutionStats>({ total: 0, completed: 0, failed: 0, running: 0 });
   const [isActivating, setIsActivating] = useState<string | null>(null);
+  const [exchangeConnections, setExchangeConnections] = useState<ExchangeConnection[]>([]);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -56,6 +65,7 @@ const AgentStudio = () => {
       setUser(session.user);
       await loadAgents(session.user.id);
       await loadExecutionStats(session.user.id);
+      await loadExchangeConnections(session.user.id);
       setLoading(false);
     };
     checkAuth();
@@ -123,6 +133,18 @@ const AgentStudio = () => {
         failed: data.filter(e => e.status === 'failed').length,
         running: data.filter(e => e.status === 'running').length,
       });
+    }
+  };
+
+  const loadExchangeConnections = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('exchange_connections')
+      .select('id, exchange_name, health_status, is_testnet, permissions')
+      .eq('user_id', userId)
+      .eq('is_active', true);
+
+    if (!error && data) {
+      setExchangeConnections(data);
     }
   };
 
@@ -422,6 +444,62 @@ const AgentStudio = () => {
                     </TabsContent>
 
                     <TabsContent value="settings" className="mt-4 space-y-6">
+                      {/* Exchange Connections */}
+                      <div className="p-4 border rounded-lg">
+                        <div className="flex items-center justify-between mb-3">
+                          <Label className="text-base font-medium">Exchange Connections</Label>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => navigate('/exchange-connections')}
+                          >
+                            Manage
+                          </Button>
+                        </div>
+                        {exchangeConnections.length === 0 ? (
+                          <div className="p-4 bg-muted/50 rounded-lg text-center">
+                            <AlertTriangle className="h-8 w-8 mx-auto text-yellow-500 mb-2" />
+                            <p className="text-sm text-muted-foreground">No exchange connections</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Connect an exchange to enable live trading
+                            </p>
+                            <Button 
+                              variant="default" 
+                              size="sm" 
+                              className="mt-3"
+                              onClick={() => navigate('/exchange-connections')}
+                            >
+                              Connect Exchange
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {exchangeConnections.map((conn) => (
+                              <div key={conn.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                                <div className="flex items-center gap-3">
+                                  <div className={`w-2 h-2 rounded-full ${
+                                    conn.health_status === 'healthy' ? 'bg-green-500' : 
+                                    conn.health_status === 'error' ? 'bg-red-500' : 'bg-yellow-500'
+                                  }`} />
+                                  <span className="font-medium">{conn.exchange_name}</span>
+                                  {conn.is_testnet && (
+                                    <Badge variant="outline" className="text-xs">Testnet</Badge>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {conn.permissions?.trade ? (
+                                    <Badge variant="default" className="text-xs">Trading Enabled</Badge>
+                                  ) : (
+                                    <Badge variant="secondary" className="text-xs">Read Only</Badge>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Trading Mode */}
                       <div className="flex items-center justify-between p-4 border rounded-lg">
                         <div>
                           <Label className="text-base font-medium">Trading Mode</Label>
@@ -436,6 +514,7 @@ const AgentStudio = () => {
                           <Switch
                             checked={!selectedAgent.is_paper_trading}
                             onCheckedChange={() => toggleTradingMode(selectedAgent)}
+                            disabled={exchangeConnections.length === 0 && !selectedAgent.is_paper_trading}
                           />
                           <Label className="text-sm">Live</Label>
                         </div>
