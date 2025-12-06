@@ -159,10 +159,27 @@ const ExchangeConnections = () => {
         throw new Error(data?.error || 'Failed to save connection');
       }
 
+      const permissionText = data.permissions?.trade 
+        ? 'with trading enabled' 
+        : 'with read-only access';
+
       toast({
         title: 'Connection Saved',
-        description: 'Exchange connection added successfully',
+        description: `${formData.exchangeName} connected ${permissionText}`,
       });
+
+      // Auto-sync portfolio after saving connection
+      try {
+        await supabase.functions.invoke('sync-portfolio', {
+          body: { connectionId: data.connection.id },
+        });
+        toast({
+          title: 'Portfolio Synced',
+          description: 'Your portfolio has been synced from the exchange',
+        });
+      } catch (syncError) {
+        console.error('Portfolio sync failed:', syncError);
+      }
 
       setIsDialogOpen(false);
       setFormData({ exchangeName: '', apiKey: '', apiSecret: '', passphrase: '', isTestnet: false });
