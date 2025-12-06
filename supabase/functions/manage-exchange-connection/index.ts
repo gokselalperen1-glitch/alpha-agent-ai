@@ -122,7 +122,65 @@ serve(async (req) => {
         throw new Error(`Exchange ${exchangeName} not supported`);
       }
 
-      // Save exchange connection with enhanced fields
+      // First test the connection to verify credentials and detect permissions
+      const ExchangeClass = (ccxtLib as any)[exchangeConfig.ccxtId];
+      
+      if (!ExchangeClass) {
+        throw new Error(`Exchange ${exchangeName} not supported by CCXT`);
+      }
+      
+      const exchangeInstanceConfig: any = {
+        apiKey,
+        secret: apiSecret,
+        enableRateLimit: true,
+      };
+
+      if (passphrase) {
+        exchangeInstanceConfig.password = passphrase;
+      }
+
+      if (isTestnet && exchangeConfig.features.testnet) {
+        exchangeInstanceConfig.sandbox = true;
+      }
+
+      const exchange = new ExchangeClass(exchangeInstanceConfig);
+
+      // Verify credentials by fetching balance
+      console.log(`Testing connection to ${exchangeName}...`);
+      await exchange.fetchBalance();
+      const markets = await exchange.loadMarkets();
+
+      // Detect permissions
+      const permissions = {
+        read: true,
+        trade: false,
+        withdraw: false,
+      };
+
+      try {
+        await exchange.fetchOpenOrders();
+        permissions.trade = true;
+        console.log(`Trading permission detected for ${exchangeName}`);
+      } catch (e) {
+        console.log(`Trading permission not detected for ${exchangeName}`);
+      }
+
+      // Get supported trading pairs
+      const supportedPairs: string[] = [];
+      if (exchangeConfig.supportedAssets && exchangeConfig.baseCurrencies) {
+        const assets = exchangeConfig.supportedAssets;
+        const bases = exchangeConfig.baseCurrencies;
+        for (const asset of assets) {
+          for (const base of bases) {
+            const pair = `${asset}/${base}`;
+            if (markets[pair]) {
+              supportedPairs.push(pair);
+            }
+          }
+        }
+      }
+
+      // Save exchange connection with verified permissions
       const { data: connection, error } = await supabase
         .from('exchange_connections')
         .insert({
@@ -136,14 +194,23 @@ serve(async (req) => {
           health_status: 'healthy',
           last_health_check: new Date().toISOString(),
           rate_limit_config: exchangeConfig.rateLimit,
+          permissions: permissions,
+          supported_pairs: supportedPairs.slice(0, 50),
         })
         .select()
         .single();
 
       if (error) throw error;
 
+      console.log(`Exchange connection saved: ${connection.id} with trading=${permissions.trade}`);
+
       return new Response(
-        JSON.stringify({ success: true, connection }),
+        JSON.stringify({ 
+          success: true, 
+          connection,
+          permissions,
+          supportedPairs: supportedPairs.length,
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
