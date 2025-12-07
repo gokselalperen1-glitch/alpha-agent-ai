@@ -6,6 +6,8 @@ export type NodeType =
   | 'news-monitor'
   | 'fundamental-analysis'
   | 'ai-risk-assessment'
+  | 'ai-connector'
+  | 'portfolio-connector'
   | 'execute-trade'
   | 'send-alert'
   | 'if-condition';
@@ -47,8 +49,8 @@ export interface Workflow {
 
 export const NODE_CATEGORIES = {
   triggers: ['schedule-trigger'],
-  data: ['market-data', 'technical-indicators', 'news-monitor', 'fundamental-analysis'],
-  analysis: ['ai-risk-assessment', 'sentiment-analysis'],
+  data: ['market-data', 'portfolio-connector', 'technical-indicators', 'news-monitor', 'fundamental-analysis'],
+  analysis: ['ai-connector', 'ai-risk-assessment', 'sentiment-analysis'],
   actions: ['execute-trade', 'send-alert'],
   logic: ['if-condition'],
 } as const;
@@ -65,6 +67,12 @@ export const NODE_DEFINITIONS = {
     description: 'Fetch real-time market data',
     category: 'data',
     color: 'hsl(var(--primary))',
+  },
+  'portfolio-connector': {
+    label: 'Portfolio Connector',
+    description: 'Connect to your exchange portfolio',
+    category: 'data',
+    color: 'hsl(142 71% 45%)',
   },
   'technical-indicators': {
     label: 'Technical Indicators',
@@ -89,6 +97,12 @@ export const NODE_DEFINITIONS = {
     description: 'Analyze company fundamentals',
     category: 'data',
     color: 'hsl(var(--primary))',
+  },
+  'ai-connector': {
+    label: 'AI Connector',
+    description: 'AI-powered market analysis & signals',
+    category: 'analysis',
+    color: 'hsl(280 70% 55%)',
   },
   'ai-risk-assessment': {
     label: 'AI Risk Analysis',
