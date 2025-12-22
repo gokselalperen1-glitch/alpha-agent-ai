@@ -130,8 +130,7 @@ export const RealtimePortfolioTracker = ({ userId }: RealtimePortfolioTrackerPro
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none" />
+        <Card className="overflow-hidden relative">
           <CardContent className="pt-6 relative">
             <div className="flex items-center justify-between">
               <div>
@@ -155,13 +154,9 @@ export const RealtimePortfolioTracker = ({ userId }: RealtimePortfolioTrackerPro
         </Card>
 
         <Card className={cn(
-          "overflow-hidden transition-colors duration-300",
+          "overflow-hidden relative transition-colors duration-300",
           totalPnL >= 0 ? 'border-green-500/30' : 'border-red-500/30'
         )}>
-          <div className={cn(
-            "absolute inset-0 pointer-events-none",
-            totalPnL >= 0 ? 'bg-gradient-to-br from-green-500/10 to-transparent' : 'bg-gradient-to-br from-red-500/10 to-transparent'
-          )} />
           <CardContent className="pt-6 relative">
             <div className="flex items-center justify-between">
               <div>
@@ -193,11 +188,7 @@ export const RealtimePortfolioTracker = ({ userId }: RealtimePortfolioTrackerPro
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden">
-          <div className={cn(
-            "absolute inset-0 pointer-events-none",
-            totalPnLPercent >= 0 ? 'bg-gradient-to-br from-green-500/5 to-transparent' : 'bg-gradient-to-br from-red-500/5 to-transparent'
-          )} />
+        <Card className="overflow-hidden relative">
           <CardContent className="pt-6 relative">
             <div className="flex items-center justify-between">
               <div>
