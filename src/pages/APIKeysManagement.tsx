@@ -7,9 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Key, Check, X, AlertCircle, Brain, Database, Zap } from 'lucide-react';
+import { ArrowLeft, Key, Check, X, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface APIKey {
   id: string;
@@ -21,71 +20,29 @@ interface APIKey {
 }
 
 const DATA_PROVIDERS = [
-  // Investment AI Systems
-  {
-    id: 'aladdin',
-    name: 'BlackRock Aladdin',
-    description: 'Enterprise risk analytics and portfolio management',
-    capabilities: ['Risk Analysis', 'Portfolio Optimization', 'Asset Allocation', 'Stress Testing'],
-    category: 'ai',
-  },
-  {
-    id: 'bloomberg_terminal',
-    name: 'Bloomberg Terminal API',
-    description: 'Real-time market data and analytics',
-    capabilities: ['Market Data', 'News', 'Analytics', 'Trading'],
-    category: 'ai',
-  },
-  {
-    id: 'refinitiv',
-    name: 'Refinitiv Eikon',
-    description: 'Financial analysis and trading tools',
-    capabilities: ['Market Data', 'News', 'Fundamentals', 'ESG'],
-    category: 'ai',
-  },
-  {
-    id: 'kensho',
-    name: 'S&P Kensho',
-    description: 'AI-powered market intelligence',
-    capabilities: ['AI Analysis', 'Event Detection', 'Pattern Recognition'],
-    category: 'ai',
-  },
-  {
-    id: 'symphony_ayasdi',
-    name: 'Symphony AyasdiAI',
-    description: 'Machine learning for financial services',
-    capabilities: ['ML Models', 'Risk Detection', 'Compliance'],
-    category: 'ai',
-  },
-  // Market Data Providers
   {
     id: 'polygon',
     name: 'Polygon.io',
     description: 'Stock, forex, and crypto market data',
     capabilities: ['Stocks', 'Forex', 'Crypto', 'Options'],
-    category: 'data',
   },
   {
     id: 'alphavantage',
     name: 'Alpha Vantage',
     description: 'Technical indicators and fundamentals',
     capabilities: ['Stocks', 'Forex', 'Crypto', 'Technical Analysis'],
-    category: 'data',
   },
   {
     id: 'finnhub',
     name: 'Finnhub',
     description: 'Financial news and fundamentals',
     capabilities: ['Stocks', 'News', 'Company Data', 'Earnings'],
-    category: 'data',
   },
   {
     id: 'stocktwits',
     name: 'StockTwits',
     description: 'Social sentiment analysis (no API key required)',
     capabilities: ['Sentiment', 'Social Trends'],
-    category: 'data',
-    noKeyRequired: true,
   },
 ];
 
@@ -262,121 +219,6 @@ export default function APIKeysManagement() {
     );
   }
 
-  const ProviderCard = ({ 
-    provider, 
-    existingKey, 
-    newKey, 
-    setNewKey, 
-    testingProvider, 
-    onAddKey, 
-    onTestKey, 
-    onToggleActive, 
-    onDeleteKey 
-  }: {
-    provider: typeof DATA_PROVIDERS[0];
-    existingKey: APIKey | undefined;
-    newKey: { provider: string; apiKey: string };
-    setNewKey: (key: { provider: string; apiKey: string }) => void;
-    testingProvider: string | null;
-    onAddKey: (id: string) => void;
-    onTestKey: (id: string) => void;
-    onToggleActive: (id: string, isActive: boolean) => void;
-    onDeleteKey: (id: string) => void;
-  }) => (
-    <Card className={existingKey?.is_active ? 'border-primary/30' : ''}>
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            {provider.category === 'ai' ? (
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Brain className="h-5 w-5 text-primary" />
-              </div>
-            ) : (
-              <div className="p-2 rounded-lg bg-muted">
-                <Database className="h-5 w-5" />
-              </div>
-            )}
-            <div>
-              <CardTitle className="text-base">{provider.name}</CardTitle>
-              <CardDescription className="text-sm">{provider.description}</CardDescription>
-            </div>
-          </div>
-          {existingKey && (
-            <Badge variant={existingKey.is_active ? 'default' : 'secondary'}>
-              {existingKey.is_active ? 'Active' : 'Inactive'}
-            </Badge>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-1.5 mt-2">
-          {provider.capabilities.map((capability) => (
-            <Badge key={capability} variant="outline" className="text-xs">
-              {capability}
-            </Badge>
-          ))}
-        </div>
-      </CardHeader>
-      <CardContent>
-        {existingKey ? (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">
-                Added: {new Date(existingKey.created_at).toLocaleDateString()}
-              </span>
-              {existingKey.rate_limit_remaining !== null && (
-                <span className="text-muted-foreground">
-                  {existingKey.rate_limit_remaining} requests remaining
-                </span>
-              )}
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onTestKey(provider.id)}
-                disabled={testingProvider === provider.id || provider.noKeyRequired}
-              >
-                {testingProvider === provider.id ? 'Testing...' : 'Test'}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onToggleActive(existingKey.id, existingKey.is_active)}
-              >
-                {existingKey.is_active ? <X className="h-4 w-4" /> : <Check className="h-4 w-4" />}
-              </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => onDeleteKey(existingKey.id)}
-              >
-                Delete
-              </Button>
-            </div>
-          </div>
-        ) : provider.noKeyRequired ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Check className="h-4 w-4 text-green-500" />
-            Ready to use - no API key required
-          </div>
-        ) : (
-          <div className="flex gap-2">
-            <Input
-              type="password"
-              placeholder="Enter your API key"
-              value={newKey.provider === provider.id ? newKey.apiKey : ''}
-              onChange={(e) => setNewKey({ provider: provider.id, apiKey: e.target.value })}
-              className="flex-1"
-            />
-            <Button onClick={() => onAddKey(provider.id)} size="sm">
-              <Zap className="h-4 w-4 mr-1" />
-              Activate
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8 max-w-6xl">
@@ -403,63 +245,117 @@ export default function APIKeysManagement() {
           </AlertDescription>
         </Alert>
 
-        <Tabs defaultValue="ai" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="ai" className="flex items-center gap-2">
-              <Brain className="h-4 w-4" />
-              Investment AI Systems
-            </TabsTrigger>
-            <TabsTrigger value="data" className="flex items-center gap-2">
-              <Database className="h-4 w-4" />
-              Market Data Providers
-            </TabsTrigger>
-          </TabsList>
+        <div className="grid gap-6">
+          {DATA_PROVIDERS.map((provider) => {
+            const existingKey = getProviderKey(provider.id);
 
-          <TabsContent value="ai" className="space-y-4">
-            <Alert className="border-primary/30 bg-primary/5">
-              <Zap className="h-4 w-4" />
-              <AlertDescription>
-                Connect your enterprise AI platforms for advanced portfolio analytics and risk management.
-                Your API keys are encrypted and only activated when you add them.
-              </AlertDescription>
-            </Alert>
-            <div className="grid gap-4">
-              {DATA_PROVIDERS.filter(p => p.category === 'ai').map((provider) => (
-                <ProviderCard
-                  key={provider.id}
-                  provider={provider}
-                  existingKey={getProviderKey(provider.id)}
-                  newKey={newKey}
-                  setNewKey={setNewKey}
-                  testingProvider={testingProvider}
-                  onAddKey={handleAddKey}
-                  onTestKey={handleTestKey}
-                  onToggleActive={handleToggleActive}
-                  onDeleteKey={handleDeleteKey}
-                />
-              ))}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="data" className="space-y-4">
-            <div className="grid gap-4">
-              {DATA_PROVIDERS.filter(p => p.category === 'data').map((provider) => (
-                <ProviderCard
-                  key={provider.id}
-                  provider={provider}
-                  existingKey={getProviderKey(provider.id)}
-                  newKey={newKey}
-                  setNewKey={setNewKey}
-                  testingProvider={testingProvider}
-                  onAddKey={handleAddKey}
-                  onTestKey={handleTestKey}
-                  onToggleActive={handleToggleActive}
-                  onDeleteKey={handleDeleteKey}
-                />
-              ))}
-            </div>
-          </TabsContent>
-        </Tabs>
+            return (
+              <Card key={provider.id}>
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <Key className="h-5 w-5" />
+                        {provider.name}
+                      </CardTitle>
+                      <CardDescription className="mt-1">
+                        {provider.description}
+                      </CardDescription>
+                    </div>
+                    {existingKey && (
+                      <Badge variant={existingKey.is_active ? 'default' : 'secondary'}>
+                        {existingKey.is_active ? 'Active' : 'Inactive'}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {provider.capabilities.map((capability) => (
+                      <Badge key={capability} variant="outline" className="text-xs">
+                        {capability}
+                      </Badge>
+                    ))}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {existingKey ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm">
+                          <span className="text-muted-foreground">Added:</span>{' '}
+                          {new Date(existingKey.created_at).toLocaleDateString()}
+                        </div>
+                        {existingKey.rate_limit_remaining !== null && (
+                          <div className="text-sm">
+                            <span className="text-muted-foreground">Rate Limit:</span>{' '}
+                            {existingKey.rate_limit_remaining} requests remaining
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleTestKey(provider.id)}
+                          disabled={testingProvider === provider.id || provider.id === 'stocktwits'}
+                        >
+                          {testingProvider === provider.id ? 'Testing...' : 'Test Connection'}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleToggleActive(existingKey.id, existingKey.is_active)}
+                        >
+                          {existingKey.is_active ? (
+                            <>
+                              <X className="mr-2 h-4 w-4" />
+                              Disable
+                            </>
+                          ) : (
+                            <>
+                              <Check className="mr-2 h-4 w-4" />
+                              Enable
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDeleteKey(existingKey.id)}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  ) : provider.id === 'stocktwits' ? (
+                    <Alert>
+                      <AlertDescription>
+                        No API key required for StockTwits - it's ready to use!
+                      </AlertDescription>
+                    </Alert>
+                  ) : (
+                    <div className="space-y-3">
+                      <div>
+                        <Label htmlFor={`key-${provider.id}`}>API Key</Label>
+                        <Input
+                          id={`key-${provider.id}`}
+                          type="password"
+                          placeholder="Enter your API key"
+                          value={newKey.provider === provider.id ? newKey.apiKey : ''}
+                          onChange={(e) =>
+                            setNewKey({ provider: provider.id, apiKey: e.target.value })
+                          }
+                        />
+                      </div>
+                      <Button onClick={() => handleAddKey(provider.id)} size="sm">
+                        Add API Key
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

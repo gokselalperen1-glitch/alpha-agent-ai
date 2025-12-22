@@ -11,12 +11,6 @@ interface PortfolioItem {
   exchange_connection_id: string | null;
 }
 
-interface ExchangeConnection {
-  id: string;
-  exchange_name: string;
-  is_testnet: boolean;
-}
-
 interface RealtimePortfolioValue {
   symbol: string;
   quantity: number;
@@ -25,64 +19,42 @@ interface RealtimePortfolioValue {
   currentValue: number;
   pnl: number;
   pnlPercent: number;
-  exchangeName?: string;
 }
 
 export const useRealtimePortfolio = (userId: string | undefined) => {
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
-  const [exchangeConnections, setExchangeConnections] = useState<ExchangeConnection[]>([]);
   const [realtimeValues, setRealtimeValues] = useState<RealtimePortfolioValue[]>([]);
   const [totalValue, setTotalValue] = useState(0);
   const [totalPnL, setTotalPnL] = useState(0);
   const [totalPnLPercent, setTotalPnLPercent] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  // Get the exchange from connected accounts (default to binance)
-  const primaryExchange = useMemo(() => {
-    const conn = exchangeConnections.find(c => !c.is_testnet) || exchangeConnections[0];
-    return conn?.exchange_name?.toLowerCase() || 'binance';
-  }, [exchangeConnections]);
-
   // Memoize symbols to prevent infinite re-renders
   const symbols = useMemo(() => {
-    if (portfolioItems.length === 0) return ['btcusdt', 'ethusdt'];
+    if (portfolioItems.length === 0) return ['btcusdt'];
     return portfolioItems.map(p => `${p.asset_symbol.toLowerCase()}usdt`);
   }, [portfolioItems]);
   
   const { prices, isConnected, getPrice } = useRealtimePrices({
     symbols,
-    exchange: primaryExchange,
     enabled: true,
   });
 
-  // Load portfolio items and exchange connections
+  // Load portfolio items
   const loadPortfolio = useCallback(async () => {
     if (!userId) {
       setLoading(false);
       return;
     }
 
-    // Fetch portfolio items and exchange connections in parallel
-    const [portfolioResult, connectionsResult] = await Promise.all([
-      supabase
-        .from('portfolios')
-        .select('*')
-        .eq('user_id', userId),
-      supabase
-        .from('exchange_connections')
-        .select('id, exchange_name, is_testnet')
-        .eq('user_id', userId)
-        .eq('is_active', true)
-    ]);
+    const { data, error } = await supabase
+      .from('portfolios')
+      .select('*')
+      .eq('user_id', userId);
 
-    if (!portfolioResult.error && portfolioResult.data) {
-      setPortfolioItems(portfolioResult.data);
+    if (!error && data) {
+      setPortfolioItems(data);
     }
-
-    if (!connectionsResult.error && connectionsResult.data) {
-      setExchangeConnections(connectionsResult.data);
-    }
-
     setLoading(false);
   }, [userId]);
 
@@ -119,12 +91,6 @@ export const useRealtimePortfolio = (userId: string | undefined) => {
       return;
     }
 
-    // Find exchange name for each portfolio item
-    const getExchangeName = (connectionId: string | null) => {
-      if (!connectionId) return undefined;
-      return exchangeConnections.find(c => c.id === connectionId)?.exchange_name;
-    };
-
     const updatedValues: RealtimePortfolioValue[] = portfolioItems.map(item => {
       const symbolKey = `${item.asset_symbol.toUpperCase()}USDT`;
       const priceData = getPrice(symbolKey);
@@ -143,12 +109,8 @@ export const useRealtimePortfolio = (userId: string | undefined) => {
         currentValue,
         pnl,
         pnlPercent,
-        exchangeName: getExchangeName(item.exchange_connection_id),
       };
     });
-
-    // Sort by value descending
-    updatedValues.sort((a, b) => b.currentValue - a.currentValue);
 
     setRealtimeValues(updatedValues);
 
@@ -160,7 +122,7 @@ export const useRealtimePortfolio = (userId: string | undefined) => {
     setTotalValue(newTotalValue);
     setTotalPnL(newTotalPnL);
     setTotalPnLPercent(newTotalPnLPercent);
-  }, [portfolioItems, prices, getPrice, exchangeConnections]);
+  }, [portfolioItems, prices, getPrice]);
 
   return {
     portfolioItems,
@@ -171,6 +133,5 @@ export const useRealtimePortfolio = (userId: string | undefined) => {
     isConnected,
     loading,
     refresh: loadPortfolio,
-    exchangeConnections,
   };
 };

@@ -10,11 +10,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, Plus, CheckCircle, XCircle, AlertTriangle, Clock, Key, Brain, Wallet } from "lucide-react";
+import { Trash2, Plus, CheckCircle, XCircle, AlertTriangle, Clock, Key } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { SimplifiedPortfolioConnect } from "@/components/exchange/SimplifiedPortfolioConnect";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface ExchangeConnection {
   id: string;
@@ -273,210 +271,162 @@ const ExchangeConnections = () => {
       <main className="container mx-auto py-8 px-4">
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Portfolio Connections</h1>
-            <p className="text-muted-foreground mt-2">Connect exchanges and manage your investment AI systems</p>
+            <h1 className="text-3xl font-bold text-foreground">Exchange Connections</h1>
+            <p className="text-muted-foreground mt-2">Connect your cryptocurrency exchange accounts for live trading</p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => navigate('/api-keys')}>
-              <Brain className="mr-2 h-4 w-4" />
-              AI API Keys
+              <Key className="mr-2 h-4 w-4" />
+              Manage API Keys
             </Button>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Connection
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Connect Exchange</DialogTitle>
+                  <DialogDescription>
+                    Add your exchange API credentials. Your keys are encrypted and stored securely.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="exchange">Exchange</Label>
+                    <Select 
+                      value={formData.exchangeName} 
+                      onValueChange={(value) => setFormData({ 
+                        ...formData, 
+                        exchangeName: value,
+                        passphrase: '' // Reset passphrase when changing exchange
+                      })}
+                    >
+                      <SelectTrigger id="exchange">
+                        <SelectValue placeholder="Select exchange" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SUPPORTED_EXCHANGES.map(ex => (
+                          <SelectItem key={ex.value} value={ex.value}>
+                            {ex.label}
+                            {ex.requiresPassphrase && <span className="text-xs text-muted-foreground ml-2">(requires passphrase)</span>}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="apiKey">API Key</Label>
+                    <Input
+                      id="apiKey"
+                      type="password"
+                      value={formData.apiKey}
+                      onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
+                      placeholder="Enter API key"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="apiSecret">API Secret</Label>
+                    <Input
+                      id="apiSecret"
+                      type="password"
+                      value={formData.apiSecret}
+                      onChange={(e) => setFormData({ ...formData, apiSecret: e.target.value })}
+                      placeholder="Enter API secret"
+                    />
+                  </div>
+                  {selectedExchange?.requiresPassphrase && (
+                    <div className="space-y-2">
+                      <Label htmlFor="passphrase">Passphrase</Label>
+                      <Input
+                        id="passphrase"
+                        type="password"
+                        value={formData.passphrase}
+                        onChange={(e) => setFormData({ ...formData, passphrase: e.target.value })}
+                        placeholder="Enter passphrase"
+                      />
+                    </div>
+                  )}
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="testnet"
+                      checked={formData.isTestnet}
+                      onCheckedChange={(checked) => setFormData({ ...formData, isTestnet: checked })}
+                    />
+                    <Label htmlFor="testnet">Use Testnet (recommended for testing)</Label>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={handleTest} disabled={isTesting} variant="outline" className="flex-1">
+                      {isTesting ? 'Testing...' : 'Test Connection'}
+                    </Button>
+                    <Button onClick={handleSave} disabled={isSaving} className="flex-1">
+                      {isSaving ? 'Saving...' : 'Save Connection'}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 
-        <Tabs defaultValue="quick" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="quick" className="flex items-center gap-2">
-              <Wallet className="h-4 w-4" />
-              Quick Connect
-            </TabsTrigger>
-            <TabsTrigger value="connections" className="flex items-center gap-2">
-              <Key className="h-4 w-4" />
-              My Connections ({connections.length})
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="quick">
-            <div className="grid gap-6 md:grid-cols-2">
-              <SimplifiedPortfolioConnect 
-                onConnected={() => loadConnections()} 
-              />
-              <Card>
+        {connections.length === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <p className="text-muted-foreground mb-4">No exchange connections yet</p>
+              <Button onClick={() => setIsDialogOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Your First Connection
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {connections.map((connection) => (
+              <Card key={connection.id}>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Brain className="h-5 w-5" />
-                    Investment AI Systems
+                  <CardTitle className="flex items-center justify-between">
+                    <span className="capitalize">{connection.exchange_name}</span>
+                    {getHealthStatusIcon(connection.health_status)}
                   </CardTitle>
                   <CardDescription>
-                    Connect enterprise AI platforms for advanced analytics
+                    Connected on {new Date(connection.created_at).toLocaleDateString()}
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    Add your API keys for AI systems like BlackRock Aladdin, Bloomberg Terminal, 
-                    Refinitiv, and more to enable advanced portfolio analytics and risk management.
-                  </p>
-                  <Button onClick={() => navigate('/api-keys')} className="w-full">
-                    <Key className="mr-2 h-4 w-4" />
-                    Manage AI API Keys
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="connections">
-            <div className="flex justify-end mb-4">
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Connection
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl">
-                  <DialogHeader>
-                    <DialogTitle>Connect Exchange</DialogTitle>
-                    <DialogDescription>
-                      Add your exchange API credentials. Your keys are encrypted and stored securely.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4 py-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="exchange">Exchange</Label>
-                      <Select 
-                        value={formData.exchangeName} 
-                        onValueChange={(value) => setFormData({ 
-                          ...formData, 
-                          exchangeName: value,
-                          passphrase: ''
-                        })}
-                      >
-                        <SelectTrigger id="exchange">
-                          <SelectValue placeholder="Select exchange" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {SUPPORTED_EXCHANGES.map(ex => (
-                            <SelectItem key={ex.value} value={ex.value}>
-                              {ex.label}
-                              {ex.requiresPassphrase && <span className="text-xs text-muted-foreground ml-2">(requires passphrase)</span>}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="apiKey">API Key</Label>
-                      <Input
-                        id="apiKey"
-                        type="password"
-                        value={formData.apiKey}
-                        onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
-                        placeholder="Enter API key"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="apiSecret">API Secret</Label>
-                      <Input
-                        id="apiSecret"
-                        type="password"
-                        value={formData.apiSecret}
-                        onChange={(e) => setFormData({ ...formData, apiSecret: e.target.value })}
-                        placeholder="Enter API secret"
-                      />
-                    </div>
-                    {selectedExchange?.requiresPassphrase && (
-                      <div className="space-y-2">
-                        <Label htmlFor="passphrase">Passphrase</Label>
-                        <Input
-                          id="passphrase"
-                          type="password"
-                          value={formData.passphrase}
-                          onChange={(e) => setFormData({ ...formData, passphrase: e.target.value })}
-                          placeholder="Enter passphrase"
-                        />
-                      </div>
+                <CardContent className="space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    {connection.is_testnet && (
+                      <Badge variant="outline">Testnet</Badge>
                     )}
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="testnet"
-                        checked={formData.isTestnet}
-                        onCheckedChange={(checked) => setFormData({ ...formData, isTestnet: checked })}
-                      />
-                      <Label htmlFor="testnet">Use Testnet (recommended for testing)</Label>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button onClick={handleTest} disabled={isTesting} variant="outline" className="flex-1">
-                        {isTesting ? 'Testing...' : 'Test Connection'}
-                      </Button>
-                      <Button onClick={handleSave} disabled={isSaving} className="flex-1">
-                        {isSaving ? 'Saving...' : 'Save Connection'}
-                      </Button>
-                    </div>
+                    <Badge variant={connection.health_status === 'healthy' ? 'default' : 'destructive'}>
+                      {getHealthStatusText(connection.health_status)}
+                    </Badge>
+                    {connection.permissions.trade ? (
+                      <Badge variant="default">Trading Enabled</Badge>
+                    ) : (
+                      <Badge variant="secondary">Read Only</Badge>
+                    )}
                   </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-
-            {connections.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <Wallet className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground mb-4">No exchange connections yet</p>
-                  <Button onClick={() => setIsDialogOpen(true)}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Your First Connection
+                  {connection.last_health_check && (
+                    <p className="text-xs text-muted-foreground">
+                      Last checked: {new Date(connection.last_health_check).toLocaleString()}
+                    </p>
+                  )}
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => handleDelete(connection.id)}
+                    className="w-full"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Remove
                   </Button>
                 </CardContent>
               </Card>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {connections.map((connection) => (
-                  <Card key={connection.id}>
-                    <CardHeader>
-                      <CardTitle className="flex items-center justify-between">
-                        <span className="capitalize">{connection.exchange_name}</span>
-                        {getHealthStatusIcon(connection.health_status)}
-                      </CardTitle>
-                      <CardDescription>
-                        Connected on {new Date(connection.created_at).toLocaleDateString()}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="flex flex-wrap gap-2">
-                        {connection.is_testnet && (
-                          <Badge variant="outline">Testnet</Badge>
-                        )}
-                        <Badge variant={connection.health_status === 'healthy' ? 'default' : 'destructive'}>
-                          {getHealthStatusText(connection.health_status)}
-                        </Badge>
-                        {connection.permissions.trade ? (
-                          <Badge variant="default">Trading Enabled</Badge>
-                        ) : (
-                          <Badge variant="secondary">Read Only</Badge>
-                        )}
-                      </div>
-                      {connection.last_health_check && (
-                        <p className="text-xs text-muted-foreground">
-                          Last checked: {new Date(connection.last_health_check).toLocaleString()}
-                        </p>
-                      )}
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDelete(connection.id)}
-                        className="w-full"
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Remove
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
+            ))}
+          </div>
+        )}
       </main>
     </div>
   );

@@ -65,10 +65,10 @@ export default {
         'gradient-hero': 'var(--gradient-hero)',
       },
       boxShadow: {
-        'soft': '0 2px 8px hsl(215 55% 15% / 0.08)',
-        'medium': '0 4px 16px hsl(215 55% 15% / 0.12)',
-        'strong': '0 8px 32px hsl(215 55% 15% / 0.16)',
-        'glow': '0 0 40px hsl(160 65% 50% / 0.2)',
+        'soft': 'var(--shadow-soft)',
+        'medium': 'var(--shadow-medium)',
+        'strong': 'var(--shadow-strong)',
+        'glow': 'var(--shadow-glow)',
       },
       borderRadius: {
         lg: "var(--radius)",
