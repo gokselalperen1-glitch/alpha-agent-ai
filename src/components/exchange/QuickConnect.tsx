@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,11 +6,22 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { CheckCircle, Loader2, ArrowRight } from 'lucide-react';
+import { CheckCircle, Loader2, ArrowRight, Wallet, RefreshCw } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 interface QuickConnectProps {
   onSuccess?: (connectionId: string) => void;
   onCancel?: () => void;
+  compact?: boolean;
+}
+
+interface ExchangeConnection {
+  id: string;
+  exchange_name: string;
+  is_active: boolean;
+  is_testnet: boolean;
+  health_status: string;
+  permissions: { read: boolean; trade: boolean };
 }
 
 const EXCHANGES = [
@@ -22,12 +33,14 @@ const EXCHANGES = [
   { id: 'okx', name: 'OKX', logo: '⚫', requiresPassphrase: true },
 ];
 
-export const QuickConnect = ({ onSuccess, onCancel }: QuickConnectProps) => {
+export const QuickConnect = ({ onSuccess, onCancel, compact = false }: QuickConnectProps) => {
   const { toast } = useToast();
   const [step, setStep] = useState<'select' | 'credentials' | 'success'>('select');
   const [selectedExchange, setSelectedExchange] = useState<typeof EXCHANGES[0] | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionId, setConnectionId] = useState<string | null>(null);
+  const [existingConnections, setExistingConnections] = useState<ExchangeConnection[]>([]);
+  const [isSyncing, setIsSyncing] = useState<string | null>(null);
   
   const [credentials, setCredentials] = useState({
     apiKey: '',
@@ -36,9 +49,47 @@ export const QuickConnect = ({ onSuccess, onCancel }: QuickConnectProps) => {
     isTestnet: true,
   });
 
+  useEffect(() => {
+    loadExistingConnections();
+  }, []);
+
+  const loadExistingConnections = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('manage-exchange-connection', {
+        body: { action: 'list' },
+      });
+      if (!error && data?.success) {
+        setExistingConnections(data.connections || []);
+      }
+    } catch {
+      // Silent fail
+    }
+  };
+
   const handleSelectExchange = (exchange: typeof EXCHANGES[0]) => {
     setSelectedExchange(exchange);
     setStep('credentials');
+  };
+
+  const handleSyncPortfolio = async (connectionId: string) => {
+    setIsSyncing(connectionId);
+    try {
+      await supabase.functions.invoke('sync-portfolio', {
+        body: { connectionId },
+      });
+      toast({
+        title: 'Portfolio Synced',
+        description: 'Your portfolio has been updated from the exchange',
+      });
+    } catch {
+      toast({
+        title: 'Sync Failed',
+        description: 'Could not sync portfolio',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSyncing(null);
+    }
   };
 
   const handleConnect = async () => {
@@ -96,6 +147,8 @@ export const QuickConnect = ({ onSuccess, onCancel }: QuickConnectProps) => {
         title: 'Connected!',
         description: `Successfully connected to ${selectedExchange.name}`,
       });
+
+      loadExistingConnections();
     } catch (err: any) {
       toast({
         title: 'Connection Failed',
@@ -106,6 +159,66 @@ export const QuickConnect = ({ onSuccess, onCancel }: QuickConnectProps) => {
       setIsConnecting(false);
     }
   };
+
+  // Show connected exchanges if any exist
+  if (existingConnections.length > 0 && step === 'select') {
+    return (
+      <Card className={compact ? 'border-0 shadow-none' : ''}>
+        <CardHeader className={compact ? 'pb-2' : ''}>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Wallet className="h-5 w-5" />
+            Connected Portfolios
+          </CardTitle>
+          <CardDescription>Your exchange connections</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {existingConnections.map((conn) => {
+            const exchange = EXCHANGES.find(e => e.id === conn.exchange_name);
+            return (
+              <div 
+                key={conn.id} 
+                className="flex items-center justify-between p-3 rounded-lg bg-accent/30"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">{exchange?.logo || '💱'}</span>
+                  <div>
+                    <p className="font-medium capitalize">{conn.exchange_name}</p>
+                    <div className="flex gap-1 mt-1">
+                      {conn.is_testnet && (
+                        <Badge variant="outline" className="text-xs">Testnet</Badge>
+                      )}
+                      <Badge 
+                        variant={conn.health_status === 'healthy' ? 'default' : 'secondary'}
+                        className="text-xs"
+                      >
+                        {conn.health_status === 'healthy' ? 'Connected' : conn.health_status}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleSyncPortfolio(conn.id)}
+                  disabled={isSyncing === conn.id}
+                >
+                  <RefreshCw className={`h-4 w-4 ${isSyncing === conn.id ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
+            );
+          })}
+          
+          <Button 
+            variant="outline" 
+            className="w-full mt-2"
+            onClick={() => setStep('select')}
+          >
+            Add Another Exchange
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (step === 'success') {
     return (
@@ -119,7 +232,11 @@ export const QuickConnect = ({ onSuccess, onCancel }: QuickConnectProps) => {
             </p>
           </div>
           <Button 
-            onClick={() => connectionId && onSuccess?.(connectionId)}
+            onClick={() => {
+              if (connectionId) onSuccess?.(connectionId);
+              setStep('select');
+              setCredentials({ apiKey: '', apiSecret: '', passphrase: '', isTestnet: true });
+            }}
             className="w-full"
           >
             Continue <ArrowRight className="ml-2 h-4 w-4" />
@@ -219,9 +336,12 @@ export const QuickConnect = ({ onSuccess, onCancel }: QuickConnectProps) => {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Quick Connect</CardTitle>
+    <Card className={compact ? 'border-0 shadow-none' : ''}>
+      <CardHeader className={compact ? 'pb-2' : ''}>
+        <CardTitle className="flex items-center gap-2">
+          <Wallet className="h-5 w-5" />
+          Connect Portfolio
+        </CardTitle>
         <CardDescription>Select your exchange to get started</CardDescription>
       </CardHeader>
       <CardContent>
