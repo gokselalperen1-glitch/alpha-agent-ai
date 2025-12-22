@@ -1,8 +1,9 @@
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Bot, Plus, TrendingUp, Zap, AlertCircle } from "lucide-react";
+import { Bot, Plus, TrendingUp, Zap, AlertCircle, Key } from "lucide-react";
 import { ExecutionHistory } from "./ExecutionHistory";
+import { QuickConnect } from "@/components/exchange/QuickConnect";
 
 export const DashboardOverview = () => {
   const navigate = useNavigate();
@@ -16,10 +17,16 @@ export const DashboardOverview = () => {
             Welcome to your InvestAI control center
           </p>
         </div>
-        <Button className="gap-2" onClick={() => navigate('/agent-builder')}>
-          <Plus className="h-4 w-4" />
-          Create Agent
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => navigate('/api-keys')}>
+            <Key className="h-4 w-4 mr-2" />
+            API Keys
+          </Button>
+          <Button className="gap-2" onClick={() => navigate('/agent-builder')}>
+            <Plus className="h-4 w-4" />
+            Create Agent
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -76,7 +83,10 @@ export const DashboardOverview = () => {
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {/* Quick Connect - Portfolio Connections */}
+        <QuickConnect compact onSuccess={() => {}} />
+
         <Card>
           <CardHeader>
             <CardTitle>Quick Start Guide</CardTitle>
@@ -88,9 +98,9 @@ export const DashboardOverview = () => {
                 1
               </div>
               <div>
-                <p className="font-medium">Create your first agent</p>
+                <p className="font-medium">Connect your portfolio</p>
                 <p className="text-sm text-muted-foreground">
-                  Use our visual builder to design investment strategies
+                  Link your exchange account to sync your portfolio
                 </p>
               </div>
             </div>
@@ -99,9 +109,9 @@ export const DashboardOverview = () => {
                 2
               </div>
               <div>
-                <p className="font-medium">Test with paper trading</p>
+                <p className="font-medium">Add AI API keys</p>
                 <p className="text-sm text-muted-foreground">
-                  Validate your strategy without risking real money
+                  Connect Alaadin AI or other investment platforms
                 </p>
               </div>
             </div>
@@ -110,9 +120,9 @@ export const DashboardOverview = () => {
                 3
               </div>
               <div>
-                <p className="font-medium">Connect to exchanges</p>
+                <p className="font-medium">Create your agent</p>
                 <p className="text-sm text-muted-foreground">
-                  Link your exchange accounts for live trading
+                  Build AI-powered trading strategies
                 </p>
               </div>
             </div>
