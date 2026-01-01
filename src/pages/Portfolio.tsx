@@ -11,6 +11,7 @@ import { TrendingUp, TrendingDown, Wallet, RefreshCw, Link2, Clock } from "lucid
 import { usePortfolioSync } from "@/hooks/usePortfolioSync";
 import { LivePriceTicker } from "@/components/exchange/LivePriceTicker";
 import { RealtimePortfolioTracker } from "@/components/exchange/RealtimePortfolioTracker";
+import { QuickConnect } from "@/components/exchange/QuickConnect";
 
 interface Transaction {
   id: string;
@@ -134,16 +135,18 @@ const Portfolio = () => {
         )}
 
         {connections.length === 0 && (
-          <Card className="mb-8 border-dashed">
-            <CardContent className="py-8 text-center">
-              <Link2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">No Exchanges Connected</h3>
-              <p className="text-muted-foreground mb-4">Connect your exchange accounts to sync your portfolio in real-time</p>
-              <Button variant="outline" onClick={() => navigate('/exchange-connections')}>
-                Connect Exchange
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="mb-8 grid md:grid-cols-2 gap-6">
+            <Card className="border-dashed">
+              <CardContent className="py-8 text-center">
+                <Link2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">No Exchanges Connected</h3>
+                <p className="text-muted-foreground mb-4">Connect your exchange accounts to sync your portfolio in real-time</p>
+              </CardContent>
+            </Card>
+            <QuickConnect 
+              onSuccess={() => syncPortfolio()}
+            />
+          </div>
         )}
 
         {/* Real-time Portfolio Tracker */}
