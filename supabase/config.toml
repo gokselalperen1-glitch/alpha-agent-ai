@@ -1,10 +1,10 @@
 project_id = "pqshhuhxvihsxyudcznx"
 
 [functions.workflow-executor]
-verify_jwt = true
+verify_jwt = false
 
 [functions.lovable-ai-chat]
-verify_jwt = true
+verify_jwt = false
 
 [functions.workflow-scheduler]
 verify_jwt = false
@@ -13,13 +13,13 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.api-connector]
-verify_jwt = true
+verify_jwt = false
 
 [functions.ai-workflow-generator]
-verify_jwt = true
+verify_jwt = false
 
 [functions.market-context-analyzer]
-verify_jwt = true
+verify_jwt = false
 
 [functions.exchange-health-check]
 verify_jwt = false
@@ -31,4 +31,4 @@ verify_jwt = true
 verify_jwt = false
 
 [functions.ai-analysis]
-verify_jwt = true
+verify_jwt = false
