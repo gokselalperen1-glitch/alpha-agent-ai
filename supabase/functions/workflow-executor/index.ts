@@ -1018,88 +1018,122 @@ serve(async (req) => {
   }
 
   try {
-    const { agentId, workflowData } = await req.json();
+    const { agentId, workflowData, testMode = false } = await req.json();
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get auth token
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) throw new Error('No authorization header');
+    let userId = 'test-user';
+    let isPaperTrading = true;
+    let executionId = crypto.randomUUID();
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) throw new Error('Unauthorized');
+    // In test mode, skip auth and agent lookup
+    if (!testMode) {
+      // Get auth token
+      const authHeader = req.headers.get('Authorization');
+      if (!authHeader) throw new Error('No authorization header');
 
-    // Get agent details
-    const { data: agent, error: agentError } = await supabase
-      .from('agents')
-      .select('*')
-      .eq('id', agentId)
-      .single();
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+      if (authError || !user) throw new Error('Unauthorized');
 
-    if (agentError || !agent) throw new Error('Agent not found');
+      userId = user.id;
 
-    // Create execution record
-    const { data: execution, error: execError } = await supabase
-      .from('executions')
-      .insert([{
-        user_id: user.id,
-        agent_id: agentId,
-        status: 'running',
-      }])
-      .select()
-      .single();
+      // Get agent details
+      const { data: agent, error: agentError } = await supabase
+        .from('agents')
+        .select('*')
+        .eq('id', agentId)
+        .single();
 
-    if (execError) throw execError;
+      if (agentError || !agent) throw new Error('Agent not found');
+      isPaperTrading = agent.is_paper_trading;
+
+      // Create execution record
+      const { data: execution, error: execError } = await supabase
+        .from('executions')
+        .insert([{
+          user_id: user.id,
+          agent_id: agentId,
+          status: 'running',
+        }])
+        .select()
+        .single();
+
+      if (execError) throw execError;
+      executionId = execution.id;
+    }
+
+    console.log('🚀 Starting workflow execution', { agentId, testMode, nodeCount: workflowData?.nodes?.length });
 
     // Initialize execution context
     const context: ExecutionContext = {
       nodeOutputs: new Map(),
       workflowState: {},
-      userId: user.id,
-      agentId,
-      executionId: execution.id,
-      isPaperTrading: agent.is_paper_trading,
+      userId,
+      agentId: agentId || 'test-agent',
+      executionId,
+      isPaperTrading,
     };
 
     // Build execution plan
-    const nodes = workflowData.nodes || [];
-    const edges = workflowData.edges || [];
+    const nodes = workflowData?.nodes || [];
+    const edges = workflowData?.edges || [];
     const executionOrder = buildExecutionPlan(nodes, edges);
 
-    console.log('Execution order:', executionOrder);
+    console.log('📋 Execution order:', executionOrder);
 
     // Execute nodes in order
+    const executionLog: string[] = [];
     for (const nodeId of executionOrder) {
       const node = nodes.find((n: WorkflowNode) => n.id === nodeId);
       if (!node) continue;
 
-      await executeNode(node, context, supabase);
+      console.log(`📦 Executing node: ${node.type} (${node.id})`);
+      executionLog.push(`Executing: ${node.data?.label || node.type}`);
+
+      try {
+        await executeNode(node, context, supabase);
+        executionLog.push(`✅ Completed: ${node.data?.label || node.type}`);
+      } catch (nodeError: any) {
+        console.error(`❌ Node ${node.id} failed:`, nodeError.message);
+        executionLog.push(`❌ Failed: ${node.data?.label || node.type} - ${nodeError.message}`);
+        // Continue with other nodes instead of stopping
+      }
     }
 
-    // Update execution status
-    await supabase
-      .from('executions')
-      .update({
-        status: 'completed',
-        completed_at: new Date().toISOString(),
-      })
-      .eq('id', execution.id);
+    // Update execution status if not in test mode
+    if (!testMode && executionId) {
+      await supabase
+        .from('executions')
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', executionId);
+    }
+
+    // Convert Map to object for JSON serialization
+    const outputsObj: Record<string, any> = {};
+    context.nodeOutputs.forEach((value, key) => {
+      outputsObj[key] = value;
+    });
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        executionId: execution.id,
-        outputs: Object.fromEntries(context.nodeOutputs),
+        executionId,
+        outputs: outputsObj,
+        executionLog,
+        timestamp: new Date().toISOString()
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error: any) {
     console.error('Execution error:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ success: false, error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
