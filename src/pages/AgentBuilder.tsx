@@ -18,6 +18,7 @@ import { CustomNode } from '@/components/workflow/CustomNode';
 import { NodeLibrary } from '@/components/workflow/NodeLibrary';
 import { NodeConfigPanel } from '@/components/workflow/NodeConfigPanel';
 import { AIWorkflowGenerator } from '@/components/workflow/AIWorkflowGenerator';
+import { ConnectionSetupPanel } from '@/components/workflow/ConnectionSetupPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Save, Play, ArrowLeft, Sparkles } from 'lucide-react';
@@ -34,6 +35,9 @@ const nodeTypes = {
   'news-monitor': CustomNode,
   'fundamental-analysis': CustomNode,
   'ai-risk-assessment': CustomNode,
+  'ai-connector': CustomNode,
+  'portfolio-connector': CustomNode,
+  'investment-ai': CustomNode,
   'execute-trade': CustomNode,
   'send-alert': CustomNode,
   'if-condition': CustomNode,
@@ -499,7 +503,10 @@ const AgentBuilderContent = () => {
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        <NodeLibrary onNodeDragStart={onNodeDragStart} />
+        <div className="flex flex-col">
+          <ConnectionSetupPanel />
+          <NodeLibrary onNodeDragStart={onNodeDragStart} />
+        </div>
         
         <div className="flex-1" ref={reactFlowWrapper}>
           <ReactFlow
