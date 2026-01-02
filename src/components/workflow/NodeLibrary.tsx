@@ -1,8 +1,8 @@
 import { NodeType, NODE_DEFINITIONS, NODE_CATEGORIES } from '@/types/workflow';
-import { Activity, Database, Brain, TrendingUp, Bell, GitBranch, LineChart, MessageSquare, Newspaper, BarChart3, Sparkles, Link2 } from 'lucide-react';
+import { Activity, Database, Brain, TrendingUp, Bell, GitBranch, LineChart, MessageSquare, Newspaper, BarChart3, Sparkles, Link2, Cpu } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 
-const iconMap = {
+const iconMap: Record<NodeType, any> = {
   'schedule-trigger': Activity,
   'market-data': Database,
   'portfolio-connector': Link2,
@@ -11,6 +11,7 @@ const iconMap = {
   'news-monitor': Newspaper,
   'fundamental-analysis': BarChart3,
   'ai-connector': Sparkles,
+  'investment-ai': Cpu,
   'ai-risk-assessment': Brain,
   'execute-trade': TrendingUp,
   'send-alert': Bell,

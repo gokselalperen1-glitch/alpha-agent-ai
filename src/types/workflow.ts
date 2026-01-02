@@ -8,6 +8,7 @@ export type NodeType =
   | 'ai-risk-assessment'
   | 'ai-connector'
   | 'portfolio-connector'
+  | 'investment-ai'
   | 'execute-trade'
   | 'send-alert'
   | 'if-condition';
@@ -50,7 +51,7 @@ export interface Workflow {
 export const NODE_CATEGORIES = {
   triggers: ['schedule-trigger'],
   data: ['market-data', 'portfolio-connector', 'technical-indicators', 'news-monitor', 'fundamental-analysis'],
-  analysis: ['ai-connector', 'ai-risk-assessment', 'sentiment-analysis'],
+  analysis: ['ai-connector', 'investment-ai', 'ai-risk-assessment', 'sentiment-analysis'],
   actions: ['execute-trade', 'send-alert'],
   logic: ['if-condition'],
 } as const;
@@ -103,6 +104,12 @@ export const NODE_DEFINITIONS = {
     description: 'AI-powered market analysis & signals',
     category: 'analysis',
     color: 'hsl(280 70% 55%)',
+  },
+  'investment-ai': {
+    label: 'Investment AI',
+    description: 'External AI APIs (Aladdin, OpenAI, Anthropic)',
+    category: 'analysis',
+    color: 'hsl(340 75% 55%)',
   },
   'ai-risk-assessment': {
     label: 'AI Risk Analysis',

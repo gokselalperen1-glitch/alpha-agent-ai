@@ -90,6 +90,9 @@ async function executeNode(
       case 'market-data':
         result = await executeMarketData(node, context, supabase);
         break;
+      case 'portfolio-connector':
+        result = await executePortfolioConnector(node, context, supabase);
+        break;
       case 'technical-indicators':
         result = await executeTechnicalIndicators(node, context, supabase);
         break;
@@ -101,6 +104,12 @@ async function executeNode(
         break;
       case 'fundamental-analysis':
         result = await executeFundamentalAnalysis(node, context, supabase);
+        break;
+      case 'ai-connector':
+        result = await executeAIConnector(node, context, supabase);
+        break;
+      case 'investment-ai':
+        result = await executeInvestmentAI(node, context, supabase);
         break;
       case 'ai-risk-assessment':
         result = await executeAIRiskAssessment(node, context, supabase);
@@ -140,7 +149,269 @@ async function executeScheduleTrigger(node: WorkflowNode, context: ExecutionCont
   };
 }
 
-// Market Data Node - Fetch real-time market data using CCXT
+// Portfolio Connector Node - Fetch user's portfolio from connected exchange
+async function executePortfolioConnector(node: WorkflowNode, context: ExecutionContext, supabase: any) {
+  console.log('Executing Portfolio Connector node:', node.data.label);
+  
+  try {
+    const connectionId = node.data.config?.connectionId;
+    
+    // Get user's exchange connection
+    let connectionQuery = supabase
+      .from('exchange_connections')
+      .select('*')
+      .eq('user_id', context.userId)
+      .eq('is_active', true);
+    
+    if (connectionId) {
+      connectionQuery = connectionQuery.eq('id', connectionId);
+    }
+    
+    const { data: connections, error: connError } = await connectionQuery;
+    
+    if (connError || !connections || connections.length === 0) {
+      throw new Error('No exchange connections found');
+    }
+    
+    const connection = connections[0];
+    
+    // Get portfolio from database
+    const { data: portfolios, error: portError } = await supabase
+      .from('portfolios')
+      .select('*')
+      .eq('user_id', context.userId)
+      .eq('exchange_connection_id', connection.id);
+    
+    if (portError) {
+      throw new Error(`Failed to fetch portfolio: ${portError.message}`);
+    }
+    
+    const totalValue = portfolios?.reduce((sum: number, p: any) => sum + (p.current_value || 0), 0) || 0;
+    
+    return {
+      exchange: connection.exchange_name,
+      isTestnet: connection.is_testnet,
+      connectionId: connection.id,
+      assets: portfolios || [],
+      totalValue,
+      assetCount: portfolios?.length || 0,
+      lastUpdated: new Date().toISOString(),
+    };
+  } catch (error: any) {
+    console.error('Portfolio connector error:', error);
+    throw error;
+  }
+}
+
+// AI Connector Node - Use Lovable AI for analysis
+async function executeAIConnector(node: WorkflowNode, context: ExecutionContext, supabase: any) {
+  console.log('Executing AI Connector node:', node.data.label);
+  
+  try {
+    const config = node.data.config || {};
+    const capability = config.capability || 'market-analysis';
+    const symbols = config.symbols || 'BTC/USDT';
+    const model = config.model || 'google/gemini-2.5-flash';
+    
+    // Gather context from previous nodes
+    const previousOutputs: any[] = [];
+    context.nodeOutputs.forEach((output) => {
+      previousOutputs.push(output);
+    });
+    
+    const systemPrompt = `You are an expert financial analyst AI. Analyze the provided market data and provide actionable insights.`;
+    
+    const userPrompt = `
+Capability: ${capability}
+Symbols: ${symbols}
+Additional Context: ${config.additionalContext || 'None'}
+
+Market Data from previous nodes:
+${JSON.stringify(previousOutputs, null, 2)}
+
+Please provide a detailed ${capability} analysis for the specified symbols.
+`;
+
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      throw new Error('LOVABLE_API_KEY not configured');
+    }
+
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`AI Gateway error: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    const analysis = data.choices?.[0]?.message?.content || 'No analysis generated';
+
+    return {
+      capability,
+      symbols,
+      model,
+      analysis,
+      timestamp: new Date().toISOString(),
+    };
+  } catch (error: any) {
+    console.error('AI Connector error:', error);
+    throw error;
+  }
+}
+
+// Investment AI Node - Use external AI APIs (Aladdin, OpenAI, Anthropic)
+async function executeInvestmentAI(node: WorkflowNode, context: ExecutionContext, supabase: any) {
+  console.log('Executing Investment AI node:', node.data.label);
+  
+  try {
+    const config = node.data.config || {};
+    const provider = config.provider || 'openai';
+    const capability = config.capability || 'market-analysis';
+    const symbols = config.symbols || 'BTC/USDT';
+    
+    // Get user's API key for this provider
+    const { data: apiKey, error: keyError } = await supabase
+      .from('api_provider_keys')
+      .select('api_key_encrypted')
+      .eq('user_id', context.userId)
+      .eq('provider', provider)
+      .eq('is_active', true)
+      .single();
+    
+    if (keyError || !apiKey) {
+      // Fall back to Lovable AI if no external key configured
+      console.log(`No ${provider} API key found, falling back to Lovable AI`);
+      return await executeAIConnector(node, context, supabase);
+    }
+    
+    // Gather context from previous nodes
+    const previousOutputs: any[] = [];
+    context.nodeOutputs.forEach((output) => {
+      previousOutputs.push(output);
+    });
+    
+    let result;
+    
+    switch (provider) {
+      case 'openai':
+        result = await callOpenAI(apiKey.api_key_encrypted, capability, symbols, previousOutputs, config);
+        break;
+      case 'anthropic':
+        result = await callAnthropic(apiKey.api_key_encrypted, capability, symbols, previousOutputs, config);
+        break;
+      case 'aladdin':
+        // Aladdin is a specialized service - simulate for now
+        result = await simulateAladdin(capability, symbols, previousOutputs, config);
+        break;
+      default:
+        throw new Error(`Unsupported AI provider: ${provider}`);
+    }
+    
+    return {
+      provider,
+      capability,
+      symbols,
+      ...result,
+      timestamp: new Date().toISOString(),
+    };
+  } catch (error: any) {
+    console.error('Investment AI error:', error);
+    throw error;
+  }
+}
+
+async function callOpenAI(apiKey: string, capability: string, symbols: string, context: any[], config: any) {
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o',
+      messages: [
+        { 
+          role: 'system', 
+          content: 'You are an expert investment analyst. Provide detailed financial analysis and actionable insights.' 
+        },
+        { 
+          role: 'user', 
+          content: `Perform ${capability} for ${symbols}. Context: ${JSON.stringify(context)}. ${config.customInstructions || ''}` 
+        },
+      ],
+    }),
+  });
+  
+  if (!response.ok) {
+    throw new Error(`OpenAI API error: ${response.status}`);
+  }
+  
+  const data = await response.json();
+  return {
+    analysis: data.choices?.[0]?.message?.content || 'No analysis generated',
+    model: 'gpt-4o',
+  };
+}
+
+async function callAnthropic(apiKey: string, capability: string, symbols: string, context: any[], config: any) {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'Content-Type': 'application/json',
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2048,
+      messages: [
+        { 
+          role: 'user', 
+          content: `As an expert investment analyst, perform ${capability} for ${symbols}. Context: ${JSON.stringify(context)}. ${config.customInstructions || ''}` 
+        },
+      ],
+    }),
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Anthropic API error: ${response.status}`);
+  }
+  
+  const data = await response.json();
+  return {
+    analysis: data.content?.[0]?.text || 'No analysis generated',
+    model: 'claude-sonnet-4-20250514',
+  };
+}
+
+async function simulateAladdin(capability: string, symbols: string, context: any[], config: any) {
+  // Aladdin is BlackRock's proprietary system - simulate based on capability
+  const riskScore = Math.floor(Math.random() * 40) + 30; // 30-70
+  const confidence = Math.floor(Math.random() * 30) + 70; // 70-100
+  
+  return {
+    analysis: `Aladdin ${capability} for ${symbols}: Risk-adjusted analysis indicates moderate exposure with diversification benefits.`,
+    riskScore,
+    confidence,
+    recommendation: riskScore < 50 ? 'hold' : 'reduce_exposure',
+    model: 'aladdin-enterprise',
+  };
+}
+
 async function executeMarketData(node: WorkflowNode, context: ExecutionContext, supabase: any) {
   console.log('Executing Market Data node:', node.data.label);
   

@@ -11,6 +11,7 @@ import { FundamentalAnalysisConfig } from "./config/FundamentalAnalysisConfig";
 import { AIRiskConfig } from "./config/AIRiskConfig";
 import { AIConnectorConfig } from "./config/AIConnectorConfig";
 import { PortfolioConnectorConfig } from "./config/PortfolioConnectorConfig";
+import { InvestmentAIConnectorConfig } from "./config/InvestmentAIConnectorConfig";
 import { ExecuteTradeConfig } from "./config/ExecuteTradeConfig";
 import { SendAlertConfig } from "./config/SendAlertConfig";
 import { ConditionConfig } from "./config/ConditionConfig";
@@ -45,6 +46,8 @@ export const NodeConfigPanel = ({ nodeId, nodeData, onClose, onUpdate }: NodeCon
         return <FundamentalAnalysisConfig config={nodeData.config} onUpdate={handleConfigUpdate} />;
       case 'ai-connector':
         return <AIConnectorConfig config={nodeData.config} onChange={handleConfigUpdate} />;
+      case 'investment-ai':
+        return <InvestmentAIConnectorConfig config={nodeData.config} onChange={handleConfigUpdate} />;
       case 'ai-risk-assessment':
         return <AIRiskConfig config={nodeData.config} onUpdate={handleConfigUpdate} />;
       case 'execute-trade':
