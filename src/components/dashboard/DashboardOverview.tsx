@@ -1,12 +1,47 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Bot, Plus, TrendingUp, Zap, AlertCircle, Key } from "lucide-react";
 import { ExecutionHistory } from "./ExecutionHistory";
-import { QuickConnect } from "@/components/exchange/QuickConnect";
+import { QuickStartDashboard } from "@/components/agents/QuickStartDashboard";
+import { supabase } from "@/integrations/supabase/client";
 
 export const DashboardOverview = () => {
   const navigate = useNavigate();
+  const [userId, setUserId] = useState<string | undefined>();
+  const [stats, setStats] = useState({
+    activeAgents: 0,
+    portfolioValue: 0,
+    totalExecutions: 0,
+    activeAlerts: 0,
+  });
+
+  useEffect(() => {
+    loadUserAndStats();
+  }, []);
+
+  const loadUserAndStats = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      setUserId(user.id);
+      
+      // Load stats in parallel
+      const [agentsRes, portfolioRes, executionsRes, alertsRes] = await Promise.all([
+        supabase.from('agents').select('id').eq('user_id', user.id).eq('status', 'active'),
+        supabase.from('portfolios').select('current_value').eq('user_id', user.id),
+        supabase.from('executions').select('id').eq('user_id', user.id),
+        supabase.from('alerts').select('id').eq('user_id', user.id).eq('is_read', false),
+      ]);
+
+      setStats({
+        activeAgents: agentsRes.data?.length || 0,
+        portfolioValue: portfolioRes.data?.reduce((sum, p) => sum + (p.current_value || 0), 0) || 0,
+        totalExecutions: executionsRes.data?.length || 0,
+        activeAlerts: alertsRes.data?.length || 0,
+      });
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -36,9 +71,9 @@ export const DashboardOverview = () => {
             <Bot className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">0</div>
+            <div className="text-2xl font-bold">{stats.activeAgents}</div>
             <p className="text-xs text-muted-foreground">
-              No agents running yet
+              {stats.activeAgents === 0 ? 'Deploy an agent below' : 'Agents running'}
             </p>
           </CardContent>
         </Card>
@@ -49,9 +84,11 @@ export const DashboardOverview = () => {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">$0.00</div>
+            <div className="text-2xl font-bold">
+              ${stats.portfolioValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            </div>
             <p className="text-xs text-muted-foreground">
-              Paper trading mode
+              {stats.portfolioValue === 0 ? 'Connect portfolio to see value' : 'Total synced value'}
             </p>
           </CardContent>
         </Card>
@@ -62,7 +99,7 @@ export const DashboardOverview = () => {
             <Zap className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">0</div>
+            <div className="text-2xl font-bold">{stats.totalExecutions}</div>
             <p className="text-xs text-muted-foreground">
               All time
             </p>
@@ -75,61 +112,61 @@ export const DashboardOverview = () => {
             <AlertCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">0</div>
+            <div className="text-2xl font-bold">{stats.activeAlerts}</div>
             <p className="text-xs text-muted-foreground">
-              No alerts configured
+              {stats.activeAlerts === 0 ? 'No unread alerts' : 'Unread alerts'}
             </p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {/* Quick Connect - Portfolio Connections */}
-        <QuickConnect compact onSuccess={() => {}} />
+      {/* Quick Start Dashboard with Ready-Made Agents */}
+      <QuickStartDashboard userId={userId} />
 
+      {/* Execution History */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <ExecutionHistory />
         <Card>
           <CardHeader>
-            <CardTitle>Quick Start Guide</CardTitle>
-            <CardDescription>Get started with your first AI agent</CardDescription>
+            <CardTitle>Getting Started</CardTitle>
+            <CardDescription>Follow these steps to start automated trading</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-medium">
                 1
               </div>
               <div>
-                <p className="font-medium">Connect your portfolio</p>
+                <p className="font-medium">Connect your exchange</p>
                 <p className="text-sm text-muted-foreground">
-                  Link your exchange account to sync your portfolio
+                  Link Binance, Coinbase, Kraken, or other exchanges
                 </p>
               </div>
             </div>
             <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-medium">
                 2
               </div>
               <div>
-                <p className="font-medium">Add AI API keys</p>
+                <p className="font-medium">Choose a ready-made agent</p>
                 <p className="text-sm text-muted-foreground">
-                  Connect Alaadin AI or other investment platforms
+                  Deploy Aladdin AI or other pre-configured strategies
                 </p>
               </div>
             </div>
             <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-medium">
                 3
               </div>
               <div>
-                <p className="font-medium">Create your agent</p>
+                <p className="font-medium">Start trading</p>
                 <p className="text-sm text-muted-foreground">
-                  Build AI-powered trading strategies
+                  Activate your agent and monitor performance
                 </p>
               </div>
             </div>
           </CardContent>
         </Card>
-
-        <ExecutionHistory />
       </div>
     </div>
   );
