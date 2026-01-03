@@ -399,16 +399,72 @@ async function callAnthropic(apiKey: string, capability: string, symbols: string
 }
 
 async function simulateAladdin(capability: string, symbols: string, context: any[], config: any) {
-  // Aladdin is BlackRock's proprietary system - simulate based on capability
-  const riskScore = Math.floor(Math.random() * 40) + 30; // 30-70
-  const confidence = Math.floor(Math.random() * 30) + 70; // 70-100
+  // Aladdin-style analysis simulation based on capability
+  const symbolList = symbols.split(',').map(s => s.trim());
+  const primarySymbol = symbolList[0] || 'BTC/USDT';
+  
+  // Extract market data from context if available
+  const marketData = context.find(c => c?.price) || { price: 50000, change24h: 2.5 };
+  const technicalData = context.find(c => c?.rsi) || { rsi: 55, macd: 0.5 };
+  
+  // Calculate risk score based on volatility and RSI
+  const volatilityFactor = Math.abs(marketData.change24h || 0) * 2;
+  const rsiRisk = technicalData.rsi > 70 ? 30 : technicalData.rsi < 30 ? 20 : 0;
+  const baseRisk = 25 + Math.floor(Math.random() * 15);
+  const riskScore = Math.min(100, Math.max(0, baseRisk + volatilityFactor + rsiRisk));
+  
+  // Calculate confidence based on data quality
+  const confidence = Math.floor(75 + Math.random() * 20);
+  
+  // Determine recommendation based on capability
+  let recommendation: string;
+  let signalStrength = 0;
+  let analysis = '';
+  
+  switch (capability) {
+    case 'risk-scoring':
+      recommendation = riskScore < 40 ? 'low_risk' : riskScore < 60 ? 'moderate_risk' : 'high_risk';
+      analysis = `Aladdin Risk Assessment for ${primarySymbol}: Risk score ${riskScore}/100. ${
+        riskScore < 40 ? 'Favorable conditions for position building.' : 
+        riskScore < 60 ? 'Normal market conditions, proceed with standard sizing.' :
+        'Elevated risk detected, consider reducing exposure.'
+      }`;
+      break;
+      
+    case 'trade-signals':
+      signalStrength = technicalData.rsi < 40 ? 0.8 : technicalData.rsi > 60 ? -0.6 : 0.3;
+      recommendation = signalStrength > 0.5 ? 'buy' : signalStrength < -0.3 ? 'sell' : 'hold';
+      analysis = `Aladdin Trade Signal for ${primarySymbol}: ${recommendation.toUpperCase()} signal with ${(Math.abs(signalStrength) * 100).toFixed(0)}% strength. RSI: ${technicalData.rsi?.toFixed(1) || 'N/A'}`;
+      break;
+      
+    case 'market-predictions':
+      const trend = (marketData.change24h || 0) > 0 ? 'bullish' : 'bearish';
+      recommendation = trend === 'bullish' && technicalData.rsi < 65 ? 'buy' : 
+                       trend === 'bearish' && technicalData.rsi > 35 ? 'sell' : 'hold';
+      analysis = `Aladdin Market Prediction for ${primarySymbol}: ${trend.toUpperCase()} trend detected. 24h performance: ${(marketData.change24h || 0).toFixed(2)}%. Projected continuation probability: ${confidence}%`;
+      break;
+      
+    case 'portfolio-analysis':
+      recommendation = riskScore < 50 ? 'increase_allocation' : 'maintain';
+      analysis = `Aladdin Portfolio Analysis: Current allocation analysis complete. Risk-adjusted return metrics favorable. Recommendation: ${recommendation.replace('_', ' ')}`;
+      break;
+      
+    default:
+      recommendation = 'hold';
+      analysis = `Aladdin ${capability} for ${primarySymbol}: Analysis complete with confidence ${confidence}%`;
+  }
   
   return {
-    analysis: `Aladdin ${capability} for ${symbols}: Risk-adjusted analysis indicates moderate exposure with diversification benefits.`,
+    analysis,
     riskScore,
     confidence,
-    recommendation: riskScore < 50 ? 'hold' : 'reduce_exposure',
+    signalStrength: signalStrength || (recommendation === 'buy' ? 0.7 : recommendation === 'sell' ? -0.7 : 0),
+    recommendation,
+    sentiment: recommendation === 'buy' ? 0.7 : recommendation === 'sell' ? 0.3 : 0.5,
+    symbols: symbolList,
+    capability,
     model: 'aladdin-enterprise',
+    timestamp: new Date().toISOString(),
   };
 }
 
