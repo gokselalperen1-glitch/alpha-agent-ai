@@ -4,8 +4,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Bot, Plus, TrendingUp, Zap, AlertCircle, Key } from "lucide-react";
 import { ExecutionHistory } from "./ExecutionHistory";
-import { QuickStartDashboard } from "@/components/agents/QuickStartDashboard";
+import { GettingStartedFlow } from "@/components/onboarding/GettingStartedFlow";
+import { ReadyMadeAgents } from "@/components/agents/ReadyMadeAgents";
 import { supabase } from "@/integrations/supabase/client";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { QuickConnect } from "@/components/exchange/QuickConnect";
 
 export const DashboardOverview = () => {
   const navigate = useNavigate();
@@ -16,6 +19,9 @@ export const DashboardOverview = () => {
     totalExecutions: 0,
     activeAlerts: 0,
   });
+  const [isOnboardingComplete, setIsOnboardingComplete] = useState(false);
+  const [hasPortfolio, setHasPortfolio] = useState(false);
+  const [showQuickConnect, setShowQuickConnect] = useState(false);
 
   useEffect(() => {
     loadUserAndStats();
@@ -27,20 +33,45 @@ export const DashboardOverview = () => {
       setUserId(user.id);
       
       // Load stats in parallel
-      const [agentsRes, portfolioRes, executionsRes, alertsRes] = await Promise.all([
+      const [agentsRes, portfolioRes, executionsRes, alertsRes, connectionsRes] = await Promise.all([
         supabase.from('agents').select('id').eq('user_id', user.id).eq('status', 'active'),
         supabase.from('portfolios').select('current_value').eq('user_id', user.id),
         supabase.from('executions').select('id').eq('user_id', user.id),
         supabase.from('alerts').select('id').eq('user_id', user.id).eq('is_read', false),
+        supabase.from('exchange_connections').select('id').eq('user_id', user.id).eq('is_active', true),
       ]);
+
+      const portfolioValue = portfolioRes.data?.reduce((sum, p) => sum + (p.current_value || 0), 0) || 0;
+      const hasConnection = (connectionsRes.data?.length || 0) > 0;
+      const hasPortfolioData = (portfolioRes.data?.length || 0) > 0;
 
       setStats({
         activeAgents: agentsRes.data?.length || 0,
-        portfolioValue: portfolioRes.data?.reduce((sum, p) => sum + (p.current_value || 0), 0) || 0,
+        portfolioValue,
         totalExecutions: executionsRes.data?.length || 0,
         activeAlerts: alertsRes.data?.length || 0,
       });
+
+      setHasPortfolio(hasConnection || hasPortfolioData);
+      
+      // Check if onboarding is complete
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('risk_tolerance, investor_type')
+        .eq('id', user.id)
+        .single();
+
+      const hasProfile = !!(profileData?.risk_tolerance && profileData?.investor_type);
+      const hasAgent = (agentsRes.data?.length || 0) > 0;
+      
+      setIsOnboardingComplete(hasProfile && (hasConnection || hasPortfolioData) && hasAgent);
     }
+  };
+
+  const handleConnectionSuccess = () => {
+    setShowQuickConnect(false);
+    setHasPortfolio(true);
+    loadUserAndStats();
   };
 
   return (
@@ -120,54 +151,31 @@ export const DashboardOverview = () => {
         </Card>
       </div>
 
-      {/* Quick Start Dashboard with Ready-Made Agents */}
-      <QuickStartDashboard userId={userId} />
+      {/* Onboarding Flow or Ready-Made Agents */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-1">
+          <GettingStartedFlow onComplete={() => {
+            setIsOnboardingComplete(true);
+            loadUserAndStats();
+          }} />
+        </div>
+        <div className="lg:col-span-2">
+          <ReadyMadeAgents 
+            hasPortfolioConnected={hasPortfolio} 
+            onConnectPortfolio={() => setShowQuickConnect(true)} 
+          />
+        </div>
+      </div>
 
       {/* Execution History */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <ExecutionHistory />
-        <Card>
-          <CardHeader>
-            <CardTitle>Getting Started</CardTitle>
-            <CardDescription>Follow these steps to start automated trading</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-medium">
-                1
-              </div>
-              <div>
-                <p className="font-medium">Connect your exchange</p>
-                <p className="text-sm text-muted-foreground">
-                  Link Binance, Coinbase, Kraken, or other exchanges
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-medium">
-                2
-              </div>
-              <div>
-                <p className="font-medium">Choose a ready-made agent</p>
-                <p className="text-sm text-muted-foreground">
-                  Deploy Aladdin AI or other pre-configured strategies
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-medium">
-                3
-              </div>
-              <div>
-                <p className="font-medium">Start trading</p>
-                <p className="text-sm text-muted-foreground">
-                  Activate your agent and monitor performance
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <ExecutionHistory />
+
+      {/* Quick Connect Dialog */}
+      <Dialog open={showQuickConnect} onOpenChange={setShowQuickConnect}>
+        <DialogContent className="max-w-md">
+          <QuickConnect onSuccess={handleConnectionSuccess} />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
