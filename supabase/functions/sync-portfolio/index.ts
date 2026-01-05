@@ -25,7 +25,17 @@ serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
-    const { connectionId } = await req.json();
+    // Safely parse body - handle empty or invalid JSON
+    let connectionId: string | undefined;
+    try {
+      const body = await req.text();
+      if (body && body.trim()) {
+        const parsed = JSON.parse(body);
+        connectionId = parsed.connectionId;
+      }
+    } catch (parseError) {
+      console.log('No body or invalid JSON, syncing all connections');
+    }
 
     console.log(`Syncing portfolio for user ${user.id}, connection: ${connectionId || 'all'}`);
 
