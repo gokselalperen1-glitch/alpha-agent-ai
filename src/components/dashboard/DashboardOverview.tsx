@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Bot, Plus, TrendingUp, Zap, AlertCircle, Key } from "lucide-react";
 import { ExecutionHistory } from "./ExecutionHistory";
-import { GettingStartedFlow } from "@/components/onboarding/GettingStartedFlow";
+import { QuickDemo } from "@/components/onboarding/QuickDemo";
 import { ReadyMadeAgents } from "@/components/agents/ReadyMadeAgents";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -151,21 +151,14 @@ export const DashboardOverview = () => {
         </Card>
       </div>
 
-      {/* Onboarding Flow or Ready-Made Agents */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-1">
-          <GettingStartedFlow onComplete={() => {
-            setIsOnboardingComplete(true);
-            loadUserAndStats();
-          }} />
-        </div>
-        <div className="lg:col-span-2">
-          <ReadyMadeAgents 
-            hasPortfolioConnected={hasPortfolio} 
-            onConnectPortfolio={() => setShowQuickConnect(true)} 
-          />
-        </div>
-      </div>
+      {/* Quick Demo - No Setup Required */}
+      <QuickDemo onStartFull={() => setShowQuickConnect(true)} />
+
+      {/* Ready-Made Agents */}
+      <ReadyMadeAgents 
+        hasPortfolioConnected={hasPortfolio} 
+        onConnectPortfolio={() => setShowQuickConnect(true)} 
+      />
 
       {/* Execution History */}
       <ExecutionHistory />
