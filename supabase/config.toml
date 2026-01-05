@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.ai-analysis]
 verify_jwt = false
+
+[functions.demo-agent-tick]
+verify_jwt = false
