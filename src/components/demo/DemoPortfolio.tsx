@@ -17,6 +17,8 @@ export interface DemoPosition {
   avgPrice: number;
   currentPrice: number;
   unrealizedPnl: number;
+  stopLoss?: number;
+  takeProfit?: number;
 }
 
 interface DemoPortfolioProps {

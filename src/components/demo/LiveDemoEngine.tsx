@@ -5,29 +5,82 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { AgentDecisionFlow, DecisionStep } from './AgentDecisionFlow';
 import { DemoPortfolio, DemoTrade, DemoPosition } from './DemoPortfolio';
-import { Play, Pause, RotateCcw, Zap } from 'lucide-react';
+import { IndicatorDashboard } from './IndicatorDashboard';
+import { Play, Pause, RotateCcw, Zap, Shield, TrendingUp, Flame } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface Strategy {
   id: string;
   name: string;
   description: string;
-  riskLevel: 'low' | 'medium' | 'high';
+  riskLevel: 'conservative' | 'moderate' | 'aggressive';
 }
 
 const STRATEGIES: Strategy[] = [
-  { id: 'safe-growth', name: 'Safe Growth', description: 'RSI-based, buys oversold', riskLevel: 'low' },
-  { id: 'trend-follower', name: 'Trend Follower', description: 'SMA-based trend following', riskLevel: 'medium' },
-  { id: 'momentum', name: 'Momentum', description: 'Aggressive momentum trading', riskLevel: 'high' },
+  // Conservative
+  { id: 'smart-dca', name: 'Smart DCA', description: 'Automated dollar-cost averaging with RSI-adjusted amounts', riskLevel: 'conservative' },
+  { id: 'bollinger-reversion', name: 'Mean Reversion', description: 'Buy at lower Bollinger Band, sell at upper', riskLevel: 'conservative' },
+  // Moderate
+  { id: 'macd-crossover', name: 'MACD Crossover', description: 'Trend-following with MACD + SMA50 confirmation', riskLevel: 'moderate' },
+  { id: 'multi-indicator', name: 'Multi-Indicator', description: '5-indicator consensus voting system', riskLevel: 'moderate' },
+  // Aggressive
+  { id: 'grid-trading', name: 'Grid Trading', description: 'Automated buy/sell at price grid levels', riskLevel: 'aggressive' },
+  { id: 'momentum-breakout', name: 'Breakout', description: 'Buy 20-period highs with momentum surge', riskLevel: 'aggressive' },
 ];
 
+const RISK_GROUPS = {
+  conservative: { label: 'Conservative', icon: Shield, color: 'text-green-500' },
+  moderate: { label: 'Moderate', icon: TrendingUp, color: 'text-yellow-500' },
+  aggressive: { label: 'Aggressive', icon: Flame, color: 'text-red-500' },
+};
+
 const STARTING_BALANCE = 10000;
+
+interface IndicatorVotes {
+  rsi: -1 | 0 | 1;
+  macd: -1 | 0 | 1;
+  trend: -1 | 0 | 1;
+  bollinger: -1 | 0 | 1;
+  momentum: -1 | 0 | 1;
+  totalScore: number;
+}
+
+interface RiskMetrics {
+  suggestedStopLoss: number;
+  suggestedTakeProfit: number;
+  positionSizeMultiplier: number;
+  volatilityLevel: 'low' | 'medium' | 'high';
+}
+
+interface TickData {
+  symbol: string;
+  price: number;
+  change24h: number;
+  rsi: number;
+  sma20: number;
+  bollingerUpper: number;
+  bollingerLower: number;
+  bollingerPercentB: number;
+  macdLine: number;
+  macdSignal: number;
+  macdHistogram: number;
+  atr: number;
+  high20: number;
+  low20: number;
+  signal: 'buy' | 'sell' | 'hold';
+  confidence: number;
+  reasoning: string;
+  indicatorVotes: IndicatorVotes;
+  riskMetrics: RiskMetrics;
+}
 
 interface LiveDemoEngineProps {
   onClose?: () => void;
 }
 
 export const LiveDemoEngine = ({ onClose }: LiveDemoEngineProps) => {
-  const [selectedStrategy, setSelectedStrategy] = useState<Strategy>(STRATEGIES[0]);
+  const [selectedStrategy, setSelectedStrategy] = useState<Strategy>(STRATEGIES[3]); // Multi-indicator default
+  const [selectedRiskLevel, setSelectedRiskLevel] = useState<'conservative' | 'moderate' | 'aggressive'>('moderate');
   const [isRunning, setIsRunning] = useState(false);
   const [steps, setSteps] = useState<DecisionStep[]>([]);
   const [balance, setBalance] = useState(STARTING_BALANCE);
@@ -35,7 +88,10 @@ export const LiveDemoEngine = ({ onClose }: LiveDemoEngineProps) => {
   const [trades, setTrades] = useState<DemoTrade[]>([]);
   const [lastSignal, setLastSignal] = useState<{ signal: string; reasoning: string } | null>(null);
   const [tickCount, setTickCount] = useState(0);
+  const [tickData, setTickData] = useState<TickData | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const filteredStrategies = STRATEGIES.filter(s => s.riskLevel === selectedRiskLevel);
 
   const resetDemo = useCallback(() => {
     setBalance(STARTING_BALANCE);
@@ -44,16 +100,23 @@ export const LiveDemoEngine = ({ onClose }: LiveDemoEngineProps) => {
     setSteps([]);
     setLastSignal(null);
     setTickCount(0);
+    setTickData(null);
   }, []);
 
+  // Update selected strategy when risk level changes
+  useEffect(() => {
+    const firstInLevel = STRATEGIES.find(s => s.riskLevel === selectedRiskLevel);
+    if (firstInLevel && selectedStrategy.riskLevel !== selectedRiskLevel) {
+      setSelectedStrategy(firstInLevel);
+    }
+  }, [selectedRiskLevel, selectedStrategy.riskLevel]);
+
   const runTick = useCallback(async () => {
-    const startTime = Date.now();
-    
     // Initialize steps
     setSteps([
       { id: 'fetch', name: 'Fetching Market Data', status: 'loading' },
-      { id: 'analyze', name: 'Analyzing Indicators', status: 'pending' },
-      { id: 'signal', name: 'Generating Signal', status: 'pending' },
+      { id: 'indicators', name: 'Computing Indicators', status: 'pending' },
+      { id: 'analyze', name: 'Strategy Analysis', status: 'pending' },
       { id: 'risk', name: 'Risk Assessment', status: 'pending' },
       { id: 'execute', name: 'Execute Decision', status: 'pending' },
     ]);
@@ -66,34 +129,52 @@ export const LiveDemoEngine = ({ onClose }: LiveDemoEngineProps) => {
       });
 
       if (error) throw error;
+      
+      setTickData(data);
 
       setSteps(prev => prev.map(s => 
-        s.id === 'fetch' ? { ...s, status: 'success', value: `BTC: $${data.price?.toLocaleString()} (${data.change24h > 0 ? '+' : ''}${data.change24h?.toFixed(2)}%)`, duration: Date.now() - fetchStart } : s
+        s.id === 'fetch' ? { 
+          ...s, 
+          status: 'success', 
+          value: `BTC: $${data.price?.toLocaleString()} (${data.change24h > 0 ? '+' : ''}${data.change24h?.toFixed(2)}%)`, 
+          duration: Date.now() - fetchStart 
+        } : s
       ));
 
-      // Step 2: Analyze
+      // Step 2: Indicators
+      await new Promise(r => setTimeout(r, 200));
+      setSteps(prev => prev.map(s => 
+        s.id === 'indicators' ? { ...s, status: 'loading' } : s
+      ));
       await new Promise(r => setTimeout(r, 300));
+      setSteps(prev => prev.map(s => 
+        s.id === 'indicators' ? { 
+          ...s, 
+          status: 'success', 
+          value: `RSI: ${data.rsi?.toFixed(0)} | MACD: ${data.macdHistogram?.toFixed(0)} | BB%: ${(data.bollingerPercentB * 100)?.toFixed(0)}%`, 
+          duration: 300 
+        } : s
+      ));
+
+      // Step 3: Strategy Analysis
+      await new Promise(r => setTimeout(r, 200));
       setSteps(prev => prev.map(s => 
         s.id === 'analyze' ? { ...s, status: 'loading' } : s
       ));
       await new Promise(r => setTimeout(r, 400));
+      
+      const votesSummary = `Votes: ${data.indicatorVotes?.totalScore > 0 ? '+' : ''}${data.indicatorVotes?.totalScore}/5`;
       setSteps(prev => prev.map(s => 
-        s.id === 'analyze' ? { ...s, status: 'success', value: `RSI: ${data.rsi?.toFixed(1)} | SMA20: $${data.sma20?.toLocaleString()}`, duration: 400 } : s
-      ));
-
-      // Step 3: Signal
-      await new Promise(r => setTimeout(r, 200));
-      setSteps(prev => prev.map(s => 
-        s.id === 'signal' ? { ...s, status: 'loading' } : s
-      ));
-      await new Promise(r => setTimeout(r, 300));
-      const signalColor = data.signal === 'buy' ? 'text-green-500' : data.signal === 'sell' ? 'text-red-500' : 'text-yellow-500';
-      setSteps(prev => prev.map(s => 
-        s.id === 'signal' ? { ...s, status: 'success', value: `${data.signal?.toUpperCase()} (${(data.confidence * 100).toFixed(0)}% confidence)`, duration: 300 } : s
+        s.id === 'analyze' ? { 
+          ...s, 
+          status: 'success', 
+          value: `${data.signal?.toUpperCase()} (${(data.confidence * 100).toFixed(0)}%) | ${votesSummary}`, 
+          duration: 400 
+        } : s
       ));
       setLastSignal({ signal: data.signal, reasoning: data.reasoning });
 
-      // Step 4: Risk check
+      // Step 4: Risk Assessment
       await new Promise(r => setTimeout(r, 200));
       setSteps(prev => prev.map(s => 
         s.id === 'risk' ? { ...s, status: 'loading' } : s
@@ -102,10 +183,16 @@ export const LiveDemoEngine = ({ onClose }: LiveDemoEngineProps) => {
       
       const currentPosition = positions.find(p => p.symbol === 'BTC');
       const positionValue = currentPosition ? currentPosition.quantity * data.price : 0;
-      const riskOk = positionValue < balance * 0.5; // Max 50% in one position
+      const maxPositionPercent = data.riskMetrics?.positionSizeMultiplier * 0.2; // Max 20% adjusted by volatility
+      const riskOk = positionValue < balance * maxPositionPercent;
       
       setSteps(prev => prev.map(s => 
-        s.id === 'risk' ? { ...s, status: 'success', value: riskOk ? 'Risk within limits ✓' : 'Position size limit reached', duration: 250 } : s
+        s.id === 'risk' ? { 
+          ...s, 
+          status: 'success', 
+          value: `${data.riskMetrics?.volatilityLevel?.toUpperCase()} volatility | SL: $${data.riskMetrics?.suggestedStopLoss?.toLocaleString()}`, 
+          duration: 250 
+        } : s
       ));
 
       // Step 5: Execute
@@ -115,10 +202,14 @@ export const LiveDemoEngine = ({ onClose }: LiveDemoEngineProps) => {
       ));
       await new Promise(r => setTimeout(r, 300));
 
-      // Execute trade logic
+      // Execute trade logic with volatility-adjusted sizing
+      const positionSizeMultiplier = data.riskMetrics?.positionSizeMultiplier || 1;
+      
       if (data.signal === 'buy' && data.confidence > 0.6 && riskOk && !currentPosition) {
-        // Buy: use 10% of balance
-        const tradeAmount = balance * 0.1;
+        // Buy: use adjusted percentage of balance
+        const basePercent = 0.1;
+        const adjustedPercent = basePercent * positionSizeMultiplier;
+        const tradeAmount = balance * adjustedPercent;
         const quantity = tradeAmount / data.price;
         
         setBalance(prev => prev - tradeAmount);
@@ -127,7 +218,9 @@ export const LiveDemoEngine = ({ onClose }: LiveDemoEngineProps) => {
           quantity,
           avgPrice: data.price,
           currentPrice: data.price,
-          unrealizedPnl: 0
+          unrealizedPnl: 0,
+          stopLoss: data.riskMetrics?.suggestedStopLoss,
+          takeProfit: data.riskMetrics?.suggestedTakeProfit
         }]);
         setTrades(prev => [...prev, {
           id: `trade-${Date.now()}`,
@@ -139,7 +232,12 @@ export const LiveDemoEngine = ({ onClose }: LiveDemoEngineProps) => {
         }]);
         
         setSteps(prev => prev.map(s => 
-          s.id === 'execute' ? { ...s, status: 'success', value: `Bought ${quantity.toFixed(6)} BTC @ $${data.price.toLocaleString()}`, duration: 300 } : s
+          s.id === 'execute' ? { 
+            ...s, 
+            status: 'success', 
+            value: `Bought ${quantity.toFixed(6)} BTC @ $${data.price.toLocaleString()} (${(adjustedPercent * 100).toFixed(0)}% position)`, 
+            duration: 300 
+          } : s
         ));
       } else if (data.signal === 'sell' && data.confidence > 0.6 && currentPosition) {
         // Sell position
@@ -159,11 +257,60 @@ export const LiveDemoEngine = ({ onClose }: LiveDemoEngineProps) => {
         }]);
         
         setSteps(prev => prev.map(s => 
-          s.id === 'execute' ? { ...s, status: 'success', value: `Sold @ $${data.price.toLocaleString()} (${pnl > 0 ? '+' : ''}$${pnl.toFixed(2)})`, duration: 300 } : s
+          s.id === 'execute' ? { 
+            ...s, 
+            status: 'success', 
+            value: `Sold @ $${data.price.toLocaleString()} (${pnl > 0 ? '+' : ''}$${pnl.toFixed(2)})`, 
+            duration: 300 
+          } : s
         ));
+      } else if (currentPosition) {
+        // Check stop-loss and take-profit
+        const stopHit = currentPosition.stopLoss && data.price <= currentPosition.stopLoss;
+        const tpHit = currentPosition.takeProfit && data.price >= currentPosition.takeProfit;
+        
+        if (stopHit || tpHit) {
+          const saleValue = currentPosition.quantity * data.price;
+          const pnl = saleValue - (currentPosition.quantity * currentPosition.avgPrice);
+          
+          setBalance(prev => prev + saleValue);
+          setPositions([]);
+          setTrades(prev => [...prev, {
+            id: `trade-${Date.now()}`,
+            symbol: 'BTC',
+            side: 'sell',
+            price: data.price,
+            quantity: currentPosition.quantity,
+            timestamp: new Date(),
+            pnl
+          }]);
+          
+          setSteps(prev => prev.map(s => 
+            s.id === 'execute' ? { 
+              ...s, 
+              status: 'success', 
+              value: `${stopHit ? 'Stop-loss' : 'Take-profit'} triggered @ $${data.price.toLocaleString()} (${pnl > 0 ? '+' : ''}$${pnl.toFixed(2)})`, 
+              duration: 300 
+            } : s
+          ));
+        } else {
+          setSteps(prev => prev.map(s => 
+            s.id === 'execute' ? { 
+              ...s, 
+              status: 'success', 
+              value: 'Holding position - SL/TP not triggered', 
+              duration: 300 
+            } : s
+          ));
+        }
       } else {
         setSteps(prev => prev.map(s => 
-          s.id === 'execute' ? { ...s, status: 'success', value: data.signal === 'hold' ? 'No action - holding' : 'Conditions not met', duration: 300 } : s
+          s.id === 'execute' ? { 
+            ...s, 
+            status: 'success', 
+            value: data.signal === 'hold' ? 'No action - waiting for signal' : 'Conditions not met', 
+            duration: 300 
+          } : s
         ));
       }
 
@@ -208,6 +355,8 @@ export const LiveDemoEngine = ({ onClose }: LiveDemoEngineProps) => {
   const positionValue = positions.reduce((sum, p) => sum + (p.quantity * p.currentPrice), 0);
   const totalValue = balance + positionValue;
 
+  const RiskIcon = RISK_GROUPS[selectedRiskLevel].icon;
+
   return (
     <Card className="border-primary/20">
       <CardHeader className="pb-3">
@@ -223,9 +372,33 @@ export const LiveDemoEngine = ({ onClose }: LiveDemoEngineProps) => {
       </CardHeader>
       
       <CardContent className="space-y-4">
+        {/* Risk Level Selector */}
+        <div className="flex gap-1 p-1 bg-muted rounded-lg">
+          {(Object.keys(RISK_GROUPS) as Array<keyof typeof RISK_GROUPS>).map(level => {
+            const { label, icon: Icon, color } = RISK_GROUPS[level];
+            const isSelected = selectedRiskLevel === level;
+            return (
+              <Button
+                key={level}
+                size="sm"
+                variant={isSelected ? 'default' : 'ghost'}
+                onClick={() => {
+                  setSelectedRiskLevel(level);
+                  if (!isRunning) resetDemo();
+                }}
+                disabled={isRunning}
+                className={cn("flex-1 gap-1", isSelected && color)}
+              >
+                <Icon className="h-3 w-3" />
+                {label}
+              </Button>
+            );
+          })}
+        </div>
+
         {/* Strategy Selection */}
-        <div className="flex gap-2">
-          {STRATEGIES.map(strategy => (
+        <div className="grid grid-cols-2 gap-2">
+          {filteredStrategies.map(strategy => (
             <Button
               key={strategy.id}
               size="sm"
@@ -235,17 +408,15 @@ export const LiveDemoEngine = ({ onClose }: LiveDemoEngineProps) => {
                 if (!isRunning) resetDemo();
               }}
               disabled={isRunning}
-              className="flex-1"
+              className="h-auto py-2 flex-col items-start text-left"
             >
-              {strategy.name}
+              <span className="font-medium">{strategy.name}</span>
+              <span className="text-[10px] text-muted-foreground font-normal line-clamp-1">
+                {strategy.description}
+              </span>
             </Button>
           ))}
         </div>
-        
-        {/* Strategy Description */}
-        <p className="text-xs text-muted-foreground">
-          {selectedStrategy.description} • Risk: {selectedStrategy.riskLevel}
-        </p>
         
         {/* Controls */}
         <div className="flex gap-2">
@@ -268,6 +439,29 @@ export const LiveDemoEngine = ({ onClose }: LiveDemoEngineProps) => {
               Decision Flow (Tick #{tickCount})
             </h4>
             <AgentDecisionFlow steps={steps} />
+          </div>
+        )}
+        
+        {/* Indicator Dashboard */}
+        {tickData && (
+          <div className="bg-muted/30 rounded-lg p-3">
+            <h4 className="text-xs font-medium text-muted-foreground mb-2">Technical Indicators</h4>
+            <IndicatorDashboard 
+              indicators={{
+                rsi: tickData.rsi,
+                sma20: tickData.sma20,
+                bollingerUpper: tickData.bollingerUpper,
+                bollingerLower: tickData.bollingerLower,
+                bollingerPercentB: tickData.bollingerPercentB,
+                macdHistogram: tickData.macdHistogram,
+                atr: tickData.atr,
+                high20: tickData.high20,
+                low20: tickData.low20,
+                price: tickData.price
+              }}
+              votes={tickData.indicatorVotes}
+              riskMetrics={tickData.riskMetrics}
+            />
           </div>
         )}
         
