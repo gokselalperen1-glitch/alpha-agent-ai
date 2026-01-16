@@ -2,11 +2,12 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
 import { AgentDecisionFlow, DecisionStep } from './AgentDecisionFlow';
 import { DemoPortfolio, DemoTrade, DemoPosition } from './DemoPortfolio';
 import { IndicatorDashboard } from './IndicatorDashboard';
-import { Play, Pause, RotateCcw, Zap, Shield, TrendingUp, Flame } from 'lucide-react';
+import { Play, Pause, RotateCcw, Zap, Shield, TrendingUp, Flame, HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Strategy {
@@ -16,22 +17,84 @@ interface Strategy {
   riskLevel: 'conservative' | 'moderate' | 'aggressive';
 }
 
-const STRATEGIES: Strategy[] = [
+interface StrategyInfo extends Strategy {
+  tooltip: string;
+  bestFor: string;
+}
+
+const STRATEGIES: StrategyInfo[] = [
   // Conservative
-  { id: 'smart-dca', name: 'Smart DCA', description: 'Automated dollar-cost averaging with RSI-adjusted amounts', riskLevel: 'conservative' },
-  { id: 'bollinger-reversion', name: 'Mean Reversion', description: 'Buy at lower Bollinger Band, sell at upper', riskLevel: 'conservative' },
+  { 
+    id: 'smart-dca', 
+    name: 'Smart DCA', 
+    description: 'Automated dollar-cost averaging with RSI-adjusted amounts', 
+    riskLevel: 'conservative',
+    tooltip: 'Dollar-Cost Averaging buys fixed amounts regularly, but this smart version increases purchases when RSI shows oversold conditions (good buying opportunity) and decreases when overbought.',
+    bestFor: 'Long-term wealth building with minimal monitoring'
+  },
+  { 
+    id: 'bollinger-reversion', 
+    name: 'Mean Reversion', 
+    description: 'Buy at lower Bollinger Band, sell at upper', 
+    riskLevel: 'conservative',
+    tooltip: 'Bollinger Bands show price volatility. When price touches the lower band with low RSI, it suggests the asset is oversold and likely to "revert to the mean" (bounce back up).',
+    bestFor: 'Range-bound, sideways markets'
+  },
   // Moderate
-  { id: 'macd-crossover', name: 'MACD Crossover', description: 'Trend-following with MACD + SMA50 confirmation', riskLevel: 'moderate' },
-  { id: 'multi-indicator', name: 'Multi-Indicator', description: '5-indicator consensus voting system', riskLevel: 'moderate' },
+  { 
+    id: 'macd-crossover', 
+    name: 'MACD Crossover', 
+    description: 'Trend-following with MACD + SMA50 confirmation', 
+    riskLevel: 'moderate',
+    tooltip: 'MACD (Moving Average Convergence Divergence) identifies trend changes. Buy signals occur when the MACD line crosses above its signal line AND price is above the 50-day average.',
+    bestFor: 'Trending markets with clear direction'
+  },
+  { 
+    id: 'multi-indicator', 
+    name: 'Multi-Indicator', 
+    description: '5-indicator consensus voting system', 
+    riskLevel: 'moderate',
+    tooltip: 'Uses 5 indicators (RSI, MACD, Trend, Bollinger, Momentum) that each "vote" bullish or bearish. Only trades when 3+ indicators agree, reducing false signals.',
+    bestFor: 'Balanced approach with confirmation'
+  },
   // Aggressive
-  { id: 'grid-trading', name: 'Grid Trading', description: 'Automated buy/sell at price grid levels', riskLevel: 'aggressive' },
-  { id: 'momentum-breakout', name: 'Breakout', description: 'Buy 20-period highs with momentum surge', riskLevel: 'aggressive' },
+  { 
+    id: 'grid-trading', 
+    name: 'Grid Trading', 
+    description: 'Automated buy/sell at price grid levels', 
+    riskLevel: 'aggressive',
+    tooltip: 'Places virtual buy orders below current price and sell orders above, profiting from price oscillations. Works best when price bounces within a range.',
+    bestFor: 'Volatile sideways markets with oscillation'
+  },
+  { 
+    id: 'momentum-breakout', 
+    name: 'Breakout', 
+    description: 'Buy 20-period highs with momentum surge', 
+    riskLevel: 'aggressive',
+    tooltip: 'Buys when price breaks above its 20-period high with volume confirmation, betting on continued momentum. Uses tight 2% stop-loss to limit downside.',
+    bestFor: 'Strong trending markets with breakouts'
+  },
 ];
 
 const RISK_GROUPS = {
-  conservative: { label: 'Conservative', icon: Shield, color: 'text-green-500' },
-  moderate: { label: 'Moderate', icon: TrendingUp, color: 'text-yellow-500' },
-  aggressive: { label: 'Aggressive', icon: Flame, color: 'text-red-500' },
+  conservative: { 
+    label: 'Conservative', 
+    icon: Shield, 
+    color: 'text-green-500',
+    tooltip: 'Lower risk strategies focused on steady accumulation and mean reversion. Smaller position sizes, wider stop-losses.'
+  },
+  moderate: { 
+    label: 'Moderate', 
+    icon: TrendingUp, 
+    color: 'text-yellow-500',
+    tooltip: 'Balanced strategies combining multiple indicators for confirmation. Medium position sizes with reasonable risk/reward.'
+  },
+  aggressive: { 
+    label: 'Aggressive', 
+    icon: Flame, 
+    color: 'text-red-500',
+    tooltip: 'Higher risk strategies for volatile markets. Larger positions, tighter stops, potential for bigger gains and losses.'
+  },
 };
 
 const STARTING_BALANCE = 10000;
@@ -372,51 +435,70 @@ export const LiveDemoEngine = ({ onClose }: LiveDemoEngineProps) => {
       </CardHeader>
       
       <CardContent className="space-y-4">
-        {/* Risk Level Selector */}
-        <div className="flex gap-1 p-1 bg-muted rounded-lg">
-          {(Object.keys(RISK_GROUPS) as Array<keyof typeof RISK_GROUPS>).map(level => {
-            const { label, icon: Icon, color } = RISK_GROUPS[level];
-            const isSelected = selectedRiskLevel === level;
-            return (
-              <Button
-                key={level}
-                size="sm"
-                variant={isSelected ? 'default' : 'ghost'}
-                onClick={() => {
-                  setSelectedRiskLevel(level);
-                  if (!isRunning) resetDemo();
-                }}
-                disabled={isRunning}
-                className={cn("flex-1 gap-1", isSelected && color)}
-              >
-                <Icon className="h-3 w-3" />
-                {label}
-              </Button>
-            );
-          })}
-        </div>
+        <TooltipProvider delayDuration={300}>
+          {/* Risk Level Selector */}
+          <div className="flex gap-1 p-1 bg-muted rounded-lg">
+            {(Object.keys(RISK_GROUPS) as Array<keyof typeof RISK_GROUPS>).map(level => {
+              const { label, icon: Icon, color, tooltip } = RISK_GROUPS[level];
+              const isSelected = selectedRiskLevel === level;
+              return (
+                <Tooltip key={level}>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant={isSelected ? 'default' : 'ghost'}
+                      onClick={() => {
+                        setSelectedRiskLevel(level);
+                        if (!isRunning) resetDemo();
+                      }}
+                      disabled={isRunning}
+                      className={cn("flex-1 gap-1", isSelected && color)}
+                    >
+                      <Icon className="h-3 w-3" />
+                      {label}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[250px]">
+                    <p className="text-xs">{tooltip}</p>
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })}
+          </div>
 
-        {/* Strategy Selection */}
-        <div className="grid grid-cols-2 gap-2">
-          {filteredStrategies.map(strategy => (
-            <Button
-              key={strategy.id}
-              size="sm"
-              variant={selectedStrategy.id === strategy.id ? 'default' : 'outline'}
-              onClick={() => {
-                setSelectedStrategy(strategy);
-                if (!isRunning) resetDemo();
-              }}
-              disabled={isRunning}
-              className="h-auto py-2 flex-col items-start text-left"
-            >
-              <span className="font-medium">{strategy.name}</span>
-              <span className="text-[10px] text-muted-foreground font-normal line-clamp-1">
-                {strategy.description}
-              </span>
-            </Button>
-          ))}
-        </div>
+          {/* Strategy Selection */}
+          <div className="grid grid-cols-2 gap-2">
+            {filteredStrategies.map(strategy => (
+              <Tooltip key={strategy.id}>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant={selectedStrategy.id === strategy.id ? 'default' : 'outline'}
+                    onClick={() => {
+                      setSelectedStrategy(strategy);
+                      if (!isRunning) resetDemo();
+                    }}
+                    disabled={isRunning}
+                    className="h-auto py-2 flex-col items-start text-left"
+                  >
+                    <div className="flex items-center gap-1 w-full">
+                      <span className="font-medium">{strategy.name}</span>
+                      <HelpCircle className="h-3 w-3 text-muted-foreground/50 ml-auto" />
+                    </div>
+                    <span className="text-[10px] text-muted-foreground font-normal line-clamp-1">
+                      {strategy.description}
+                    </span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-[280px]">
+                  <p className="font-medium text-xs mb-1">{strategy.name}</p>
+                  <p className="text-xs text-muted-foreground">{strategy.tooltip}</p>
+                  <p className="text-xs text-primary mt-1.5">Best for: {strategy.bestFor}</p>
+                </TooltipContent>
+              </Tooltip>
+            ))}
+          </div>
+        </TooltipProvider>
         
         {/* Controls */}
         <div className="flex gap-2">
