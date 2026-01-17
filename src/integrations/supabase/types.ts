@@ -127,6 +127,51 @@ export type Database = {
         }
         Relationships: []
       }
+      arbitrage_opportunities: {
+        Row: {
+          buy_exchange: string
+          buy_price: number
+          detected_at: string
+          estimated_profit: number | null
+          expires_at: string | null
+          id: string
+          sell_exchange: string
+          sell_price: number
+          spread_percent: number
+          status: string | null
+          symbol: string
+          volume_available: number | null
+        }
+        Insert: {
+          buy_exchange: string
+          buy_price: number
+          detected_at?: string
+          estimated_profit?: number | null
+          expires_at?: string | null
+          id?: string
+          sell_exchange: string
+          sell_price: number
+          spread_percent: number
+          status?: string | null
+          symbol: string
+          volume_available?: number | null
+        }
+        Update: {
+          buy_exchange?: string
+          buy_price?: number
+          detected_at?: string
+          estimated_profit?: number | null
+          expires_at?: string | null
+          id?: string
+          sell_exchange?: string
+          sell_price?: number
+          spread_percent?: number
+          status?: string | null
+          symbol?: string
+          volume_available?: number | null
+        }
+        Relationships: []
+      }
       exchange_connections: {
         Row: {
           api_key_encrypted: string
@@ -222,6 +267,156 @@ export type Database = {
           },
         ]
       }
+      leverage_settings: {
+        Row: {
+          created_at: string
+          exchange_connection_id: string | null
+          id: string
+          leverage: number
+          margin_type: string
+          max_position_size: number | null
+          symbol: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          exchange_connection_id?: string | null
+          id?: string
+          leverage?: number
+          margin_type?: string
+          max_position_size?: number | null
+          symbol: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          exchange_connection_id?: string | null
+          id?: string
+          leverage?: number
+          margin_type?: string
+          max_position_size?: number | null
+          symbol?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leverage_settings_exchange_connection_id_fkey"
+            columns: ["exchange_connection_id"]
+            isOneToOne: false
+            referencedRelation: "exchange_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          agent_id: string | null
+          average_fill_price: number | null
+          created_at: string
+          exchange_connection_id: string | null
+          exchange_order_id: string | null
+          executed_at: string | null
+          fee_currency: string | null
+          fees: number | null
+          filled_quantity: number | null
+          id: string
+          oco_group_id: string | null
+          order_type: string
+          position_id: string | null
+          post_only: boolean | null
+          price: number | null
+          quantity: number
+          reduce_only: boolean | null
+          side: string
+          status: string
+          stop_price: number | null
+          symbol: string
+          time_in_force: string | null
+          trailing_delta: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agent_id?: string | null
+          average_fill_price?: number | null
+          created_at?: string
+          exchange_connection_id?: string | null
+          exchange_order_id?: string | null
+          executed_at?: string | null
+          fee_currency?: string | null
+          fees?: number | null
+          filled_quantity?: number | null
+          id?: string
+          oco_group_id?: string | null
+          order_type: string
+          position_id?: string | null
+          post_only?: boolean | null
+          price?: number | null
+          quantity: number
+          reduce_only?: boolean | null
+          side: string
+          status?: string
+          stop_price?: number | null
+          symbol: string
+          time_in_force?: string | null
+          trailing_delta?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agent_id?: string | null
+          average_fill_price?: number | null
+          created_at?: string
+          exchange_connection_id?: string | null
+          exchange_order_id?: string | null
+          executed_at?: string | null
+          fee_currency?: string | null
+          fees?: number | null
+          filled_quantity?: number | null
+          id?: string
+          oco_group_id?: string | null
+          order_type?: string
+          position_id?: string | null
+          post_only?: boolean | null
+          price?: number | null
+          quantity?: number
+          reduce_only?: boolean | null
+          side?: string
+          status?: string
+          stop_price?: number | null
+          symbol?: string
+          time_in_force?: string | null
+          trailing_delta?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_exchange_connection_id_fkey"
+            columns: ["exchange_connection_id"]
+            isOneToOne: false
+            referencedRelation: "exchange_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_position_id_fkey"
+            columns: ["position_id"]
+            isOneToOne: false
+            referencedRelation: "positions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       portfolios: {
         Row: {
           asset_symbol: string
@@ -256,6 +451,89 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "portfolios_exchange_connection_id_fkey"
+            columns: ["exchange_connection_id"]
+            isOneToOne: false
+            referencedRelation: "exchange_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      positions: {
+        Row: {
+          closed_at: string | null
+          current_price: number | null
+          entry_price: number
+          exchange_connection_id: string | null
+          id: string
+          leverage: number
+          liquidation_price: number | null
+          margin_ratio: number | null
+          margin_type: string
+          opened_at: string
+          position_type: string
+          quantity: number
+          realized_pnl: number | null
+          side: string
+          status: string
+          stop_loss: number | null
+          symbol: string
+          take_profit: number | null
+          trailing_stop_percent: number | null
+          unrealized_pnl: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          closed_at?: string | null
+          current_price?: number | null
+          entry_price: number
+          exchange_connection_id?: string | null
+          id?: string
+          leverage?: number
+          liquidation_price?: number | null
+          margin_ratio?: number | null
+          margin_type?: string
+          opened_at?: string
+          position_type?: string
+          quantity: number
+          realized_pnl?: number | null
+          side: string
+          status?: string
+          stop_loss?: number | null
+          symbol: string
+          take_profit?: number | null
+          trailing_stop_percent?: number | null
+          unrealized_pnl?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          closed_at?: string | null
+          current_price?: number | null
+          entry_price?: number
+          exchange_connection_id?: string | null
+          id?: string
+          leverage?: number
+          liquidation_price?: number | null
+          margin_ratio?: number | null
+          margin_type?: string
+          opened_at?: string
+          position_type?: string
+          quantity?: number
+          realized_pnl?: number | null
+          side?: string
+          status?: string
+          stop_loss?: number | null
+          symbol?: string
+          take_profit?: number | null
+          trailing_stop_percent?: number | null
+          unrealized_pnl?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "positions_exchange_connection_id_fkey"
             columns: ["exchange_connection_id"]
             isOneToOne: false
             referencedRelation: "exchange_connections"
