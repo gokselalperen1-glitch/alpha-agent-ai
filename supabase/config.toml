@@ -35,3 +35,12 @@ verify_jwt = false
 
 [functions.demo-agent-tick]
 verify_jwt = false
+
+[functions.exchange-websocket-manager]
+verify_jwt = false
+
+[functions.advanced-trade-executor]
+verify_jwt = true
+
+[functions.arbitrage-scanner]
+verify_jwt = false
