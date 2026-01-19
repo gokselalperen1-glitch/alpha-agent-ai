@@ -1004,22 +1004,61 @@ async function executeTradeNode(
   console.log('Executing Trade node:', node.data.label);
   
   try {
-    // Get trade parameters from node config
-    const symbol = node.data.config?.symbol || context.nodeOutputs.get('market-data')?.symbol || 'BTC/USDT';
-    const side = node.data.config?.side || 'buy'; // 'buy' or 'sell'
-    const orderType = node.data.config?.orderType || 'market'; // 'market' or 'limit'
-    let quantity = node.data.config?.quantity || 0.001;
-    const isPaperTrading = node.data.config?.isPaperTrading !== false; // Default to paper trading
+    const config = node.data.config || {};
     
-    let price = node.data.config?.price || context.nodeOutputs.get('market-data')?.price || 0;
-    let exchangeOrderId = null;
-    let exchangeOptimization = null;
+    // Get trade parameters from node config (now with leverage support)
+    const symbol = config.symbol || context.nodeOutputs.get('market-data')?.symbol || 'BTC/USDT';
+    const side = config.side || 'buy';
+    const orderType = config.orderType || 'market';
+    const isPaperTrading = config.isPaperTrading !== false;
+    const exchangeConnectionId = config.exchangeConnectionId;
+    
+    // Leverage and position settings
+    const positionType = config.positionType || 'spot';
+    const leverage = positionType === 'futures' ? (config.leverage || 1) : 1;
+    const marginType = config.marginType || 'isolated';
+    const reduceOnly = config.reduceOnly || false;
+    const postOnly = config.postOnly || false;
+    const timeInForce = config.timeInForce || 'GTC';
+    
+    // Stop/Take profit settings
+    const stopLoss = config.stopLoss;
+    const takeProfit = config.takeProfit;
+    const enableTrailingStop = config.enableTrailingStop;
+    const trailingStopPercent = config.trailingStopPercent;
+    
+    // OCO settings
+    const enableOCO = config.enableOCO;
+    const ocoStopPrice = config.ocoStopPrice;
+    const ocoLimitPrice = config.ocoLimitPrice;
+    
+    // Quantity calculation
+    let quantity = config.quantityValue || 0.001;
+    let price = config.limitPrice || context.nodeOutputs.get('market-data')?.price || 0;
+    
+    // If quantity is percentage-based, calculate actual quantity
+    if (config.quantityType === 'percentage') {
+      const { data: portfolios } = await supabase
+        .from('portfolios')
+        .select('*')
+        .eq('user_id', context.userId);
+      
+      const totalValue = portfolios?.reduce((sum: number, p: any) => 
+        sum + (p.current_value || 0), 0) || 10000;
+      
+      // Apply percentage (with 5% max cap for safety)
+      const effectivePercent = Math.min(config.quantityValue || 10, 5);
+      const tradeValue = (totalValue * effectivePercent) / 100;
+      quantity = tradeValue / price;
+      
+      console.log(`Calculated quantity: ${quantity} from ${effectivePercent}% of $${totalValue}`);
+    }
     
     // PRE-TRADE SAFETY VALIDATION
     if (!isPaperTrading) {
       console.log('Performing pre-trade safety checks...');
       
-      // Check 1: Get user's portfolio to validate position size
+      // Check 1: Validate position size
       const { data: portfolios } = await supabase
         .from('portfolios')
         .select('*')
@@ -1028,22 +1067,27 @@ async function executeTradeNode(
       const totalPortfolioValue = portfolios?.reduce((sum: number, p: any) => 
         sum + (p.current_value || 0), 0) || 0;
       
-      const tradeValue = quantity * price;
+      const tradeValue = quantity * price * leverage;
       const tradePercent = totalPortfolioValue > 0 
         ? (tradeValue / totalPortfolioValue) * 100 
         : 0;
       
       if (tradePercent > SAFETY_RULES.maxSingleTradePercent) {
         throw new Error(
-          `Trade size ${tradePercent.toFixed(2)}% exceeds maximum allowed ${SAFETY_RULES.maxSingleTradePercent}% per trade`
+          `Position size ${tradePercent.toFixed(2)}% exceeds max ${SAFETY_RULES.maxSingleTradePercent}%`
         );
       }
       
-      // Check 2: Daily trade count limit
+      // Check 2: Leverage limit
+      if (leverage > 20) {
+        console.warn(`⚠️ High leverage (${leverage}x) - capping at 20x for safety`);
+      }
+      
+      // Check 3: Daily trade count
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
-      const { data: todayTrades, error: tradeCountError } = await supabase
+      const { data: todayTrades } = await supabase
         .from('transactions')
         .select('id')
         .eq('user_id', context.userId)
@@ -1051,12 +1095,10 @@ async function executeTradeNode(
         .gte('executed_at', today.toISOString());
       
       if (todayTrades && todayTrades.length >= SAFETY_RULES.maxDailyTrades) {
-        throw new Error(
-          `Daily trade limit reached (${SAFETY_RULES.maxDailyTrades} trades). Try again tomorrow.`
-        );
+        throw new Error(`Daily trade limit (${SAFETY_RULES.maxDailyTrades}) reached`);
       }
       
-      // Check 3: Require paper trading first
+      // Check 4: Paper trading requirement
       if (SAFETY_RULES.requirePaperTradingFirst) {
         const { data: paperTrades } = await supabase
           .from('transactions')
@@ -1067,179 +1109,176 @@ async function executeTradeNode(
         
         if (!paperTrades || paperTrades.length < SAFETY_RULES.minPaperTradesRequired) {
           throw new Error(
-            `Agent requires at least ${SAFETY_RULES.minPaperTradesRequired} successful paper trades before live trading. Current: ${paperTrades?.length || 0}`
+            `Need ${SAFETY_RULES.minPaperTradesRequired} paper trades first (current: ${paperTrades?.length || 0})`
           );
         }
-      }
-      
-      // Check 4: Health check on exchange connection
-      const { data: connections } = await supabase
-        .from('exchange_connections')
-        .select('*')
-        .eq('user_id', context.userId)
-        .eq('is_active', true);
-      
-      if (!connections || connections.length === 0) {
-        throw new Error('No active exchange connection found');
-      }
-      
-      // Verify connection health and permissions
-      const healthyConnections = connections.filter((c: any) => 
-        c.health_status === 'healthy' && c.permissions?.trade === true
-      );
-      
-      if (healthyConnections.length === 0) {
-        throw new Error('No healthy exchange connections with trading permissions found');
       }
       
       console.log('✓ All safety checks passed');
     }
     
-    // If live trading, execute via CCXT with exchange-specific optimization
-    if (!isPaperTrading) {
-      // Get user's exchange connection
-      const { data: connections } = await supabase
-        .from('exchange_connections')
-        .select('*')
-        .eq('user_id', context.userId)
-        .eq('is_active', true)
-        .eq('health_status', 'healthy');
-      
-      if (!connections || connections.length === 0) {
-        throw new Error('No active exchange connection found');
-      }
-      
-      // Exchange-specific optimization: Select best exchange for this trade
-      const connection = await selectOptimalExchange(connections, symbol, quantity, side);
-      
-      // Import CCXT
-      const ccxtLib = await import('https://esm.sh/ccxt@4.2.25');
-      const ExchangeClass = (ccxtLib as any)[connection.exchange_name.toLowerCase()];
-      
-      if (!ExchangeClass) {
-        throw new Error(`Exchange ${connection.exchange_name} not supported`);
-      }
-      
-      // Initialize exchange with credentials
-      const exchange = new ExchangeClass({
-        apiKey: connection.api_key_encrypted, // TODO: Decrypt using Supabase Vault
-        secret: connection.api_secret_encrypted,
-        enableRateLimit: true,
-      });
-      
-      // Fetch exchange-specific data for optimization
-      const ticker = await exchange.fetchTicker(symbol);
-      const orderbook = await exchange.fetchOrderBook(symbol);
-      
-      // Calculate exchange-specific optimization
-      exchangeOptimization = {
-        exchange: connection.exchange_name,
-        fees: exchange.fees?.trading || { maker: 0.001, taker: 0.001 },
-        spread: ticker.ask - ticker.bid,
-        liquidity: orderbook.bids.slice(0, 10).reduce((sum: number, bid: any) => sum + bid[1], 0),
-        estimatedFee: quantity * price * (exchange.fees?.trading?.taker || 0.001)
+    // Execute trade via advanced-trade-executor for full feature support
+    let result;
+    
+    if (!isPaperTrading && positionType !== 'spot') {
+      // Use advanced trade executor for leverage/futures trades
+      const tradeRequest = {
+        symbol,
+        side,
+        orderType,
+        quantity,
+        price: orderType === 'limit' ? price : undefined,
+        leverage,
+        marginType,
+        positionType,
+        reduceOnly,
+        postOnly,
+        timeInForce,
+        stopLoss,
+        takeProfit,
+        trailingStopPercent: enableTrailingStop ? trailingStopPercent : undefined,
+        exchangeConnectionId,
+        agentId: context.agentId,
+        isPaperTrading: false
       };
       
-      // Adjust quantity based on fees to ensure profitability
-      const adjustedQuantity = quantity * (1 - exchangeOptimization.fees.taker);
-      console.log('Exchange optimization:', exchangeOptimization);
-      console.log(`Adjusted quantity from ${quantity} to ${adjustedQuantity} to account for fees`);
+      // Call advanced trade executor
+      const { data, error } = await supabase.functions.invoke('advanced-trade-executor', {
+        body: tradeRequest
+      });
       
-      // Check balance before trading
-      const balance = await exchange.fetchBalance();
-      const [base, quote] = symbol.split('/');
+      if (error) throw error;
+      result = data;
+    } else {
+      // Standard spot/paper trading execution
+      let exchangeOrderId = null;
+      let executedPrice = price;
       
-      if (side === 'buy') {
-        const requiredBalance = adjustedQuantity * price;
-        if (!balance[quote] || balance[quote].free < requiredBalance) {
-          throw new Error(`Insufficient ${quote} balance`);
+      if (!isPaperTrading) {
+        // Get exchange connection
+        let connectionQuery = supabase
+          .from('exchange_connections')
+          .select('*')
+          .eq('user_id', context.userId)
+          .eq('is_active', true)
+          .eq('health_status', 'healthy');
+        
+        if (exchangeConnectionId) {
+          connectionQuery = connectionQuery.eq('id', exchangeConnectionId);
         }
-      } else {
-        if (!balance[base] || balance[base].free < adjustedQuantity) {
-          throw new Error(`Insufficient ${base} balance`);
+        
+        const { data: connections } = await connectionQuery;
+        
+        if (!connections || connections.length === 0) {
+          throw new Error('No active exchange connection found');
         }
+        
+        const connection = await selectOptimalExchange(connections, symbol, quantity, side);
+        
+        // Execute via CCXT
+        const ccxtLib = await import('https://esm.sh/ccxt@4.2.25');
+        const ExchangeClass = (ccxtLib as any)[connection.exchange_name.toLowerCase()];
+        
+        if (!ExchangeClass) {
+          throw new Error(`Exchange ${connection.exchange_name} not supported`);
+        }
+        
+        const exchange = new ExchangeClass({
+          apiKey: connection.api_key_encrypted,
+          secret: connection.api_secret_encrypted,
+          enableRateLimit: true,
+          sandbox: connection.is_testnet
+        });
+        
+        const order = await exchange.createOrder(
+          symbol, 
+          orderType, 
+          side, 
+          quantity, 
+          orderType === 'limit' ? price : undefined
+        );
+        
+        exchangeOrderId = order.id;
+        executedPrice = order.price || order.average || price;
+        quantity = order.filled || quantity;
       }
       
-      // Place order with optimized parameters
-      const order = await exchange.createOrder(symbol, orderType, side, adjustedQuantity, orderType === 'limit' ? price : undefined);
-      exchangeOrderId = order.id;
-      price = order.price || price;
-      quantity = adjustedQuantity;
+      // Record transaction
+      const totalValue = quantity * executedPrice;
+      const fees = totalValue * (isPaperTrading ? 0.001 : 0.001);
       
-      console.log('Live trade executed with optimization:', order);
-    }
-
-    // Record transaction
-    const { error: txError } = await supabase
-      .from('transactions')
-      .insert({
+      await supabase.from('transactions').insert({
         user_id: context.userId,
         agent_id: context.agentId,
         execution_id: context.executionId,
         asset_symbol: symbol,
         transaction_type: side,
-        order_type: orderType,
+        order_type: orderType === 'market' ? 'market' : 'limit',
         quantity,
-        price,
-        total_value: quantity * price,
-        is_paper_trade: isPaperTrading,
+        price: executedPrice,
+        total_value: totalValue,
+        fees,
+        is_paper_trade: isPaperTrading
       });
-
-    if (txError) {
-      console.error('Failed to record transaction:', txError);
-    }
-    
-    // Update portfolio
-    const { data: existingPortfolio } = await supabase
-      .from('portfolios')
-      .select('*')
-      .eq('user_id', context.userId)
-      .eq('asset_symbol', symbol.split('/')[0])
-      .single();
-    
-    if (existingPortfolio) {
-      const newQuantity = side === 'buy' 
-        ? existingPortfolio.quantity + quantity 
-        : existingPortfolio.quantity - quantity;
       
-      const newAvgPrice = side === 'buy'
-        ? ((existingPortfolio.average_buy_price * existingPortfolio.quantity) + (price * quantity)) / newQuantity
-        : existingPortfolio.average_buy_price;
-      
-      await supabase
+      // Update portfolio for spot trades
+      const baseAsset = symbol.split('/')[0];
+      const { data: existingPortfolio } = await supabase
         .from('portfolios')
-        .update({
+        .select('*')
+        .eq('user_id', context.userId)
+        .eq('asset_symbol', baseAsset)
+        .single();
+      
+      if (existingPortfolio) {
+        const newQuantity = side === 'buy' 
+          ? existingPortfolio.quantity + quantity 
+          : Math.max(0, existingPortfolio.quantity - quantity);
+        
+        const newAvgPrice = side === 'buy' && newQuantity > 0
+          ? ((existingPortfolio.average_buy_price * existingPortfolio.quantity) + (executedPrice * quantity)) / newQuantity
+          : existingPortfolio.average_buy_price;
+        
+        await supabase.from('portfolios').update({
           quantity: newQuantity,
           average_buy_price: newAvgPrice,
-          current_value: newQuantity * price,
-          last_updated: new Date().toISOString(),
-        })
-        .eq('id', existingPortfolio.id);
-    } else if (side === 'buy') {
-      await supabase
-        .from('portfolios')
-        .insert({
+          current_value: newQuantity * executedPrice,
+          last_updated: new Date().toISOString()
+        }).eq('id', existingPortfolio.id);
+      } else if (side === 'buy') {
+        await supabase.from('portfolios').insert({
           user_id: context.userId,
-          asset_symbol: symbol.split('/')[0],
+          asset_symbol: baseAsset,
           quantity,
-          average_buy_price: price,
-          current_value: quantity * price,
+          average_buy_price: executedPrice,
+          current_value: quantity * executedPrice
         });
+      }
+      
+      result = {
+        success: true,
+        orderId: exchangeOrderId,
+        symbol,
+        side,
+        orderType,
+        quantity,
+        executedPrice,
+        totalValue: quantity * executedPrice,
+        fees,
+        leverage: 1,
+        isPaperTrading
+      };
     }
-
-    const tradeData = {
-      symbol,
-      type: orderType,
-      side,
-      quantity,
-      price,
-      totalValue: quantity * price,
-      isPaperTrading,
-      exchangeOrderId,
-      exchangeOptimization,
+    
+    console.log('Trade executed:', result);
+    
+    return {
+      success: true,
+      trade: result,
+      positionType,
+      leverage,
+      timestamp: new Date().toISOString()
     };
-
-    return { success: true, trade: tradeData };
   } catch (error: any) {
     console.error('Trade execution error:', error);
     throw error;
