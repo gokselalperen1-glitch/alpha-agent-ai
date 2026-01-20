@@ -1,9 +1,10 @@
 import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
-import { LogOut, Bot, LayoutDashboard, Wallet, Settings, Sparkles } from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { LogOut, Bot, LayoutDashboard, Wallet, Settings, Sparkles, Target, ArrowRightLeft } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface DashboardNavProps {
   user: User | null;
@@ -11,6 +12,7 @@ interface DashboardNavProps {
 
 export const DashboardNav = ({ user }: DashboardNavProps) => {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -18,30 +20,40 @@ export const DashboardNav = ({ user }: DashboardNavProps) => {
     navigate("/");
   };
 
+  const isActive = (path: string) => location.pathname === path;
+
   return (
     <nav className="border-b bg-card">
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center gap-8">
             <h1 className="text-xl font-bold">InvestAI</h1>
-            <div className="hidden md:flex items-center gap-6">
-              <Button variant="ghost" size="sm" className="gap-2" onClick={() => navigate('/dashboard')}>
+            <div className="hidden md:flex items-center gap-1">
+              <Button variant="ghost" size="sm" className={cn("gap-2", isActive('/dashboard') && "bg-secondary/20")} onClick={() => navigate('/dashboard')}>
                 <LayoutDashboard className="h-4 w-4" />
                 Overview
               </Button>
-              <Button variant="ghost" size="sm" className="gap-2" onClick={() => navigate('/agent-studio')}>
+              <Button variant="ghost" size="sm" className={cn("gap-2", isActive('/agent-studio') && "bg-secondary/20")} onClick={() => navigate('/agent-studio')}>
                 <Sparkles className="h-4 w-4" />
                 Agent Studio
               </Button>
-              <Button variant="ghost" size="sm" className="gap-2" onClick={() => navigate('/my-agents')}>
+              <Button variant="ghost" size="sm" className={cn("gap-2", isActive('/my-agents') && "bg-secondary/20")} onClick={() => navigate('/my-agents')}>
                 <Bot className="h-4 w-4" />
                 My Agents
               </Button>
-              <Button variant="ghost" size="sm" className="gap-2" onClick={() => navigate('/portfolio')}>
+              <Button variant="ghost" size="sm" className={cn("gap-2", isActive('/portfolio') && "bg-secondary/20")} onClick={() => navigate('/portfolio')}>
                 <Wallet className="h-4 w-4" />
                 Portfolio
               </Button>
-              <Button variant="ghost" size="sm" className="gap-2" onClick={() => navigate('/exchange-connections')}>
+              <Button variant="ghost" size="sm" className={cn("gap-2", isActive('/positions') && "bg-secondary/20")} onClick={() => navigate('/positions')}>
+                <Target className="h-4 w-4" />
+                Positions
+              </Button>
+              <Button variant="ghost" size="sm" className={cn("gap-2", isActive('/arbitrage') && "bg-secondary/20")} onClick={() => navigate('/arbitrage')}>
+                <ArrowRightLeft className="h-4 w-4" />
+                Arbitrage
+              </Button>
+              <Button variant="ghost" size="sm" className={cn("gap-2", isActive('/exchange-connections') && "bg-secondary/20")} onClick={() => navigate('/exchange-connections')}>
                 <Settings className="h-4 w-4" />
                 Connections
               </Button>
