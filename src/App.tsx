@@ -14,6 +14,7 @@ import Portfolio from "./pages/Portfolio";
 import AgentStudio from "./pages/AgentStudio";
 import Positions from "./pages/Positions";
 import Arbitrage from "./pages/Arbitrage";
+import Trading from "./pages/Trading";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -37,6 +38,7 @@ const App = () => (
           <Route path="/agent-studio" element={<AgentStudio />} />
           <Route path="/positions" element={<Positions />} />
           <Route path="/arbitrage" element={<Arbitrage />} />
+          <Route path="/trading" element={<Trading />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

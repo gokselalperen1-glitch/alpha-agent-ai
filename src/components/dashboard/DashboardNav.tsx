@@ -2,7 +2,7 @@ import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useLocation } from "react-router-dom";
-import { LogOut, Bot, LayoutDashboard, Wallet, Settings, Sparkles, Target, ArrowRightLeft } from "lucide-react";
+import { LogOut, Bot, LayoutDashboard, Wallet, Settings, Brain, Target, ArrowRightLeft } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -33,13 +33,13 @@ export const DashboardNav = ({ user }: DashboardNavProps) => {
                 <LayoutDashboard className="h-4 w-4" />
                 Overview
               </Button>
-              <Button variant="ghost" size="sm" className={cn("gap-2", isActive('/agent-studio') && "bg-secondary/20")} onClick={() => navigate('/agent-studio')}>
-                <Sparkles className="h-4 w-4" />
-                Agent Studio
+              <Button variant="ghost" size="sm" className={cn("gap-2", isActive('/trading') && "bg-secondary/20")} onClick={() => navigate('/trading')}>
+                <Brain className="h-4 w-4" />
+                AI Trading
               </Button>
               <Button variant="ghost" size="sm" className={cn("gap-2", isActive('/my-agents') && "bg-secondary/20")} onClick={() => navigate('/my-agents')}>
                 <Bot className="h-4 w-4" />
-                My Agents
+                Agents
               </Button>
               <Button variant="ghost" size="sm" className={cn("gap-2", isActive('/portfolio') && "bg-secondary/20")} onClick={() => navigate('/portfolio')}>
                 <Wallet className="h-4 w-4" />
@@ -55,7 +55,7 @@ export const DashboardNav = ({ user }: DashboardNavProps) => {
               </Button>
               <Button variant="ghost" size="sm" className={cn("gap-2", isActive('/exchange-connections') && "bg-secondary/20")} onClick={() => navigate('/exchange-connections')}>
                 <Settings className="h-4 w-4" />
-                Connections
+                Settings
               </Button>
             </div>
           </div>
