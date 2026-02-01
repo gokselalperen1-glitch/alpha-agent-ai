@@ -6,10 +6,7 @@ import { DashboardNav } from '@/components/dashboard/DashboardNav';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Bot, Play, Pause, Plus, Activity, TrendingUp, 
-  Settings, Trash2, Brain
-} from 'lucide-react';
+import { Bot, Play, Pause, Plus, Trash2, Brain, Settings } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface Agent {
@@ -21,19 +18,12 @@ interface Agent {
   created_at: string;
 }
 
-interface ExecutionStats {
-  total: number;
-  completed: number;
-  failed: number;
-}
-
 const AgentStudio = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [agents, setAgents] = useState<Agent[]>([]);
-  const [executionStats, setExecutionStats] = useState<ExecutionStats>({ total: 0, completed: 0, failed: 0 });
   const [isActivating, setIsActivating] = useState<string | null>(null);
 
   useEffect(() => {
@@ -45,7 +35,6 @@ const AgentStudio = () => {
       }
       setUser(session.user);
       await loadAgents(session.user.id);
-      await loadExecutionStats(session.user.id);
       setLoading(false);
     };
     checkAuth();
@@ -60,21 +49,6 @@ const AgentStudio = () => {
 
     if (!error && data) {
       setAgents(data);
-    }
-  };
-
-  const loadExecutionStats = async (userId: string) => {
-    const { data } = await supabase
-      .from('executions')
-      .select('status')
-      .eq('user_id', userId);
-
-    if (data) {
-      setExecutionStats({
-        total: data.length,
-        completed: data.filter(e => e.status === 'completed').length,
-        failed: data.filter(e => e.status === 'failed').length,
-      });
     }
   };
 
@@ -126,10 +100,6 @@ const AgentStudio = () => {
     error: 'bg-red-500/20 text-red-400',
   };
 
-  const successRate = executionStats.total > 0 
-    ? Math.round((executionStats.completed / executionStats.total) * 100) 
-    : 0;
-
   return (
     <div className="min-h-screen bg-background">
       <DashboardNav user={user} />
@@ -142,7 +112,7 @@ const AgentStudio = () => {
               Agent Studio
             </h1>
             <p className="text-muted-foreground mt-2">
-              Create and manage your automated trading agents
+              Manage your trading agents
             </p>
           </div>
           <div className="flex gap-2">
@@ -155,54 +125,6 @@ const AgentStudio = () => {
               Create Agent
             </Button>
           </div>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Agents</p>
-                  <p className="text-2xl font-bold">{agents.length}</p>
-                </div>
-                <Bot className="h-8 w-8 text-primary" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Active</p>
-                  <p className="text-2xl font-bold">{agents.filter(a => a.status === 'active').length}</p>
-                </div>
-                <Activity className="h-8 w-8 text-green-500" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Executions</p>
-                  <p className="text-2xl font-bold">{executionStats.total}</p>
-                </div>
-                <TrendingUp className="h-8 w-8 text-blue-500" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Success Rate</p>
-                  <p className="text-2xl font-bold">{successRate}%</p>
-                </div>
-                <TrendingUp className="h-8 w-8 text-emerald-500" />
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         {/* Agent List */}
@@ -244,14 +166,9 @@ const AgentStudio = () => {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-xs">
-                      {agent.is_paper_trading ? '📝 Paper' : '💰 Live'}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">
-                      Created {new Date(agent.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
+                  <Badge variant="outline" className="text-xs">
+                    {agent.is_paper_trading ? '📝 Paper' : '💰 Live'}
+                  </Badge>
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
@@ -270,22 +187,12 @@ const AgentStudio = () => {
                       disabled={isActivating === agent.id}
                     >
                       {agent.status === 'active' ? (
-                        <>
-                          <Pause className="h-4 w-4 mr-1" />
-                          Pause
-                        </>
+                        <><Pause className="h-4 w-4 mr-1" />Pause</>
                       ) : (
-                        <>
-                          <Play className="h-4 w-4 mr-1" />
-                          Start
-                        </>
+                        <><Play className="h-4 w-4 mr-1" />Start</>
                       )}
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => deleteAgent(agent)}
-                    >
+                    <Button variant="ghost" size="sm" onClick={() => deleteAgent(agent)}>
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </div>

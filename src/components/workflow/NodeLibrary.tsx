@@ -1,6 +1,9 @@
+import { useState, useEffect } from 'react';
 import { NodeType, NODE_DEFINITIONS, NODE_CATEGORIES } from '@/types/workflow';
-import { Activity, Database, Brain, TrendingUp, Bell, GitBranch, LineChart, MessageSquare, Newspaper, BarChart3, Sparkles, Link2, Cpu } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { Activity, Database, Brain, TrendingUp, Bell, GitBranch, LineChart, MessageSquare, Newspaper, BarChart3, Sparkles, Link2, Cpu, CheckCircle, Key } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
 const iconMap: Record<NodeType, any> = {
   'schedule-trigger': Activity,
@@ -18,11 +21,55 @@ const iconMap: Record<NodeType, any> = {
   'if-condition': GitBranch,
 };
 
+// Nodes that require external API keys
+const API_REQUIRED_NODES: NodeType[] = ['investment-ai'];
+
+// Nodes that work without any API key (using Lovable AI)
+const FREE_AI_NODES: NodeType[] = ['ai-connector', 'ai-risk-assessment', 'sentiment-analysis'];
+
 interface NodeLibraryProps {
   onNodeDragStart: (event: React.DragEvent, nodeType: NodeType) => void;
 }
 
 export const NodeLibrary = ({ onNodeDragStart }: NodeLibraryProps) => {
+  const [configuredProviders, setConfiguredProviders] = useState<string[]>([]);
+
+  useEffect(() => {
+    checkConfiguredProviders();
+  }, []);
+
+  const checkConfiguredProviders = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: keys } = await supabase
+      .from('api_provider_keys')
+      .select('provider')
+      .eq('user_id', user.id)
+      .eq('is_active', true);
+
+    if (keys) {
+      setConfiguredProviders(keys.map(k => k.provider));
+    }
+  };
+
+  const getNodeStatus = (nodeType: NodeType) => {
+    if (FREE_AI_NODES.includes(nodeType)) {
+      return { ready: true, label: 'Ready', icon: CheckCircle };
+    }
+    if (API_REQUIRED_NODES.includes(nodeType)) {
+      const hasKey = configuredProviders.some(p => 
+        ['aladdin', 'openai', 'anthropic'].includes(p)
+      );
+      return { 
+        ready: hasKey, 
+        label: hasKey ? 'Ready' : 'API Key Required',
+        icon: hasKey ? CheckCircle : Key
+      };
+    }
+    return { ready: true, label: null, icon: null };
+  };
+
   return (
     <div className="w-64 border-r border-border bg-sidebar p-4 overflow-y-auto">
       <h3 className="font-semibold text-sidebar-foreground mb-4">Node Library</h3>
@@ -36,6 +83,7 @@ export const NodeLibrary = ({ onNodeDragStart }: NodeLibraryProps) => {
             {nodeTypes.map((nodeType) => {
               const definition = NODE_DEFINITIONS[nodeType];
               const Icon = iconMap[nodeType];
+              const status = getNodeStatus(nodeType);
               
               return (
                 <Card
@@ -52,12 +100,27 @@ export const NodeLibrary = ({ onNodeDragStart }: NodeLibraryProps) => {
                       <Icon className="w-4 h-4" style={{ color: definition.color }} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm text-card-foreground">
-                        {definition.label}
+                      <div className="flex items-center gap-1">
+                        <span className="font-medium text-sm text-card-foreground">
+                          {definition.label}
+                        </span>
+                        {status.icon && (
+                          <status.icon className={`w-3 h-3 ${status.ready ? 'text-green-500' : 'text-amber-500'}`} />
+                        )}
                       </div>
                       <div className="text-xs text-muted-foreground mt-0.5">
                         {definition.description}
                       </div>
+                      {FREE_AI_NODES.includes(nodeType) && (
+                        <Badge variant="outline" className="text-[10px] mt-1 bg-green-500/10 text-green-600 border-green-500/20">
+                          Free AI
+                        </Badge>
+                      )}
+                      {API_REQUIRED_NODES.includes(nodeType) && !status.ready && (
+                        <Badge variant="outline" className="text-[10px] mt-1 bg-amber-500/10 text-amber-600 border-amber-500/20">
+                          Add key in config
+                        </Badge>
+                      )}
                     </div>
                   </div>
                 </Card>

@@ -1,15 +1,18 @@
 import { memo } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
-import { AgentNodeData, NODE_DEFINITIONS } from '@/types/workflow';
-import { Activity, Database, Brain, TrendingUp, Bell, GitBranch, LineChart, MessageSquare, Newspaper, BarChart3 } from 'lucide-react';
+import { AgentNodeData, NODE_DEFINITIONS, NodeType } from '@/types/workflow';
+import { Activity, Database, Brain, TrendingUp, Bell, GitBranch, LineChart, MessageSquare, Newspaper, BarChart3, Sparkles, Link2, Cpu } from 'lucide-react';
 
-const iconMap = {
+const iconMap: Record<NodeType, any> = {
   'schedule-trigger': Activity,
   'market-data': Database,
+  'portfolio-connector': Link2,
   'technical-indicators': LineChart,
   'sentiment-analysis': MessageSquare,
   'news-monitor': Newspaper,
   'fundamental-analysis': BarChart3,
+  'ai-connector': Sparkles,
+  'investment-ai': Cpu,
   'ai-risk-assessment': Brain,
   'execute-trade': TrendingUp,
   'send-alert': Bell,
