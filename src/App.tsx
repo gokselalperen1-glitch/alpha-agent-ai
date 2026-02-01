@@ -9,7 +9,6 @@ import Dashboard from "./pages/Dashboard";
 import AgentBuilder from "./pages/AgentBuilder";
 import MyAgents from "./pages/MyAgents";
 import ExchangeConnections from "./pages/ExchangeConnections";
-import APIKeysManagement from "./pages/APIKeysManagement";
 import Portfolio from "./pages/Portfolio";
 import AgentStudio from "./pages/AgentStudio";
 import Positions from "./pages/Positions";
@@ -33,7 +32,6 @@ const App = () => (
           <Route path="/agent-builder" element={<AgentBuilder />} />
           <Route path="/agent-builder/:id" element={<AgentBuilder />} />
           <Route path="/exchange-connections" element={<ExchangeConnections />} />
-          <Route path="/api-keys" element={<APIKeysManagement />} />
           <Route path="/portfolio" element={<Portfolio />} />
           <Route path="/agent-studio" element={<AgentStudio />} />
           <Route path="/positions" element={<Positions />} />

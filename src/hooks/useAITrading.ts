@@ -65,103 +65,87 @@ export const useAITrading = ({ userId, initialBalance = 10000 }: UseAITradingPro
       if (!tickData?.price) throw new Error('No price data received');
 
       setLastPrice(tickData.price);
+      setLastAnalysis(tickData);
 
-      // Get AI analysis
-      const { data: aiData, error: aiError } = await supabase.functions.invoke('market-context-analyzer', {
-        body: {
-          symbol,
-          marketData: {
-            price: tickData.price,
-            change24h: tickData.change24h || 0,
-            high20: tickData.high20 || tickData.price * 1.05,
-            low20: tickData.low20 || tickData.price * 0.95
-          },
-          indicators: {
-            rsi: tickData.rsi || 50,
-            macd: tickData.macdHistogram || 0,
-            sma20: tickData.sma20 || tickData.price,
-            bollingerUpper: tickData.bollingerUpper || tickData.price * 1.02,
-            bollingerLower: tickData.bollingerLower || tickData.price * 0.98
-          },
-          sentiment: {
-            score: tickData.indicatorVotes?.totalScore || 0,
-            sources: ['technical_analysis']
-          }
-        }
-      });
+      const rsi = tickData.rsi ?? 50;
+      const macdHist = tickData.macdHistogram ?? 0;
+      const price = tickData.price;
+      const sma20 = tickData.sma20 ?? price;
 
-      const analysis = aiData?.analysis;
-      setLastAnalysis({ ...tickData, aiRecommendation: analysis });
+      // Determine signal based on technical indicators
+      let signal: 'buy' | 'sell' = 'buy';
+      let confidence = 0.6;
+      let reasoning = '';
 
-      // Determine signal - use AI recommendation, but also force signals for demo
-      let signal: 'buy' | 'sell' | 'hold' = 'hold';
-      let confidence = 0.5;
-      let reasoning = 'Market analysis in progress';
-
-      if (analysis?.recommendations?.action) {
-        signal = analysis.recommendations.action === 'buy' ? 'buy' : 
-                 analysis.recommendations.action === 'sell' ? 'sell' : 'hold';
-        confidence = (analysis.confidence || 50) / 100;
-        reasoning = analysis.reasoning || reasoning;
+      // Strong RSI signals
+      if (rsi < 30) {
+        signal = 'buy';
+        confidence = 0.75;
+        reasoning = `RSI is oversold at ${rsi.toFixed(1)}. Strong buy signal.`;
+      } else if (rsi > 70) {
+        signal = 'sell';
+        confidence = 0.75;
+        reasoning = `RSI is overbought at ${rsi.toFixed(1)}. Strong sell signal.`;
+      }
+      // Moderate RSI signals
+      else if (rsi < 40) {
+        signal = 'buy';
+        confidence = 0.65;
+        reasoning = `RSI is low at ${rsi.toFixed(1)}. Buy opportunity detected.`;
+      } else if (rsi > 60) {
+        signal = 'sell';
+        confidence = 0.65;
+        reasoning = `RSI is high at ${rsi.toFixed(1)}. Consider taking profits.`;
+      }
+      // MACD signals for neutral RSI
+      else if (macdHist > 50) {
+        signal = 'buy';
+        confidence = 0.6;
+        reasoning = `MACD histogram positive (${macdHist.toFixed(0)}). Bullish momentum building.`;
+      } else if (macdHist < -50) {
+        signal = 'sell';
+        confidence = 0.6;
+        reasoning = `MACD histogram negative (${macdHist.toFixed(0)}). Bearish pressure increasing.`;
+      }
+      // Trend-based signals
+      else if (price > sma20 * 1.02) {
+        signal = 'buy';
+        confidence = 0.55;
+        reasoning = `Price above SMA20. Uptrend continuation expected.`;
+      } else if (price < sma20 * 0.98) {
+        signal = 'sell';
+        confidence = 0.55;
+        reasoning = `Price below SMA20. Downtrend may continue.`;
+      }
+      // Default: alternate for demo
+      else {
+        signal = Math.random() > 0.5 ? 'buy' : 'sell';
+        confidence = 0.5;
+        reasoning = `Market neutral. ${signal === 'buy' ? 'Looking for entry' : 'Watching for exit'} at $${price.toLocaleString()}.`;
       }
 
-      // If AI says wait/hold, check technical indicators to force a signal for demo
-      if (signal === 'hold') {
-        const rsi = tickData.rsi || 50;
-        const macdHist = tickData.macdHistogram || 0;
-        
-        // RSI-based signal
-        if (rsi < 35) {
-          signal = 'buy';
-          confidence = 0.65;
-          reasoning = `RSI is oversold at ${rsi.toFixed(1)}. Technical indicators suggest a potential bounce.`;
-        } else if (rsi > 65) {
-          signal = 'sell';
-          confidence = 0.65;
-          reasoning = `RSI is overbought at ${rsi.toFixed(1)}. Consider taking profits.`;
-        } 
-        // MACD-based signal
-        else if (macdHist > 0 && Math.random() > 0.6) {
-          signal = 'buy';
-          confidence = 0.55;
-          reasoning = `MACD histogram is positive (${macdHist.toFixed(2)}), suggesting bullish momentum.`;
-        } else if (macdHist < 0 && Math.random() > 0.6) {
-          signal = 'sell';
-          confidence = 0.55;
-          reasoning = `MACD histogram is negative (${macdHist.toFixed(2)}), suggesting bearish momentum.`;
-        }
-        // Random signal for demo (40% chance if no clear signal)
-        else if (Math.random() > 0.6) {
-          signal = Math.random() > 0.5 ? 'buy' : 'sell';
-          confidence = 0.5 + Math.random() * 0.2;
-          reasoning = signal === 'buy' 
-            ? `Market showing potential entry opportunity at $${tickData.price.toLocaleString()}.`
-            : `Consider profit-taking at current levels around $${tickData.price.toLocaleString()}.`;
-        }
-      }
-
-      // Check if we should generate an order
+      // Check position constraints
       const hasPosition = positions.some(p => p.symbol === symbol);
       
-      // Only generate buy if no position and have balance
-      if (signal === 'buy' && hasPosition) {
-        signal = 'hold'; // Already have position
-      }
-      // Only generate sell if have position
+      // Adjust signal based on current positions
       if (signal === 'sell' && !hasPosition) {
-        signal = 'hold'; // No position to sell
+        // No position to sell, flip to buy
+        signal = 'buy';
+        reasoning = `No position to sell. ${reasoning} Converting to buy signal.`;
       }
-
-      if (signal === 'hold') {
-        return null;
+      
+      if (signal === 'buy' && hasPosition) {
+        // Already have position, flip to sell to take profits
+        signal = 'sell';
+        reasoning = `Already holding ${symbol}. ${reasoning} Converting to sell signal.`;
       }
 
       // Calculate quantity
       const quantity = signal === 'buy' 
-        ? (balance * 0.1) / tickData.price
-        : positions.find(p => p.symbol === symbol)?.quantity || 0;
+        ? Math.min((balance * 0.15) / price, balance * 0.5 / price)
+        : positions.find(p => p.symbol === symbol)?.quantity || (balance * 0.1) / price;
 
-      if (quantity <= 0) {
+      if (quantity <= 0 || (signal === 'buy' && balance < price * quantity)) {
         return null;
       }
 
@@ -170,17 +154,17 @@ export const useAITrading = ({ userId, initialBalance = 10000 }: UseAITradingPro
         symbol,
         side: signal,
         quantity,
-        price: tickData.price,
+        price,
         confidence,
         reasoning,
         indicators: {
-          rsi: tickData.rsi || 50,
-          macd: (tickData.macdHistogram || 0) > 0 ? 'Bullish' : 'Bearish',
-          trend: (tickData.price || 0) > (tickData.sma20 || 0) ? 'Uptrend' : 'Downtrend'
+          rsi,
+          macd: macdHist > 0 ? 'Bullish' : 'Bearish',
+          trend: price > sma20 ? 'Uptrend' : 'Downtrend'
         },
-        riskScore: analysis?.riskScore || 50,
+        riskScore: Math.round(50 + (rsi - 50) * 0.5),
         createdAt: new Date(),
-        expiresAt: new Date(Date.now() + 5 * 60 * 1000) // 5 minutes
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000)
       };
 
       return suggestion;
@@ -214,21 +198,34 @@ export const useAITrading = ({ userId, initialBalance = 10000 }: UseAITradingPro
           throw new Error('Insufficient balance');
         }
         setBalance(prev => prev - cost);
-        setPositions(prev => [...prev, {
-          symbol: order.symbol,
-          quantity: order.quantity,
-          avgPrice: order.price
-        }]);
+        setPositions(prev => {
+          const existing = prev.find(p => p.symbol === order.symbol);
+          if (existing) {
+            return prev.map(p => p.symbol === order.symbol 
+              ? { ...p, quantity: p.quantity + order.quantity, avgPrice: (p.avgPrice * p.quantity + order.price * order.quantity) / (p.quantity + order.quantity) }
+              : p
+            );
+          }
+          return [...prev, { symbol: order.symbol, quantity: order.quantity, avgPrice: order.price }];
+        });
       } else {
         const position = positions.find(p => p.symbol === order.symbol);
+        const sellQty = Math.min(order.quantity, position?.quantity || order.quantity);
+        const saleValue = sellQty * order.price;
+        setBalance(prev => prev + saleValue);
+        
         if (position) {
-          const saleValue = order.quantity * order.price;
-          setBalance(prev => prev + saleValue);
-          setPositions(prev => prev.filter(p => p.symbol !== order.symbol));
+          if (sellQty >= position.quantity) {
+            setPositions(prev => prev.filter(p => p.symbol !== order.symbol));
+          } else {
+            setPositions(prev => prev.map(p => p.symbol === order.symbol 
+              ? { ...p, quantity: p.quantity - sellQty }
+              : p
+            ));
+          }
         }
       }
 
-      // Record in history
       setTradeHistory(prev => [...prev, {
         id: order.id,
         symbol: order.symbol,
@@ -239,7 +236,6 @@ export const useAITrading = ({ userId, initialBalance = 10000 }: UseAITradingPro
         executedAt: new Date()
       }]);
 
-      // Execute on exchange if live trading
       if (!isPaperTrading) {
         await supabase.functions.invoke('advanced-trade-executor', {
           body: {
