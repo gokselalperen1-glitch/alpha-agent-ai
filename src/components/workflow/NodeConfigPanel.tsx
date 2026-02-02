@@ -1,7 +1,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { NodeType, AgentNodeData } from "@/types/workflow";
-import { X } from "lucide-react";
+import { NodeType, AgentNodeData, NODE_DEFINITIONS } from "@/types/workflow";
+import { X, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { ScheduleTriggerConfig } from "./config/ScheduleTriggerConfig";
 import { MarketDataConfig } from "./config/MarketDataConfig";
 import { TechnicalIndicatorsConfig } from "./config/TechnicalIndicatorsConfig";
@@ -23,10 +24,19 @@ interface NodeConfigPanelProps {
   onUpdate: (nodeId: string, config: any) => void;
 }
 
+// Nodes powered by free Lovable AI
+const FREE_AI_NODES: NodeType[] = ['ai-connector', 'ai-risk-assessment', 'sentiment-analysis'];
+// Nodes requiring external API keys  
+const API_REQUIRED_NODES: NodeType[] = ['investment-ai'];
+
 export const NodeConfigPanel = ({ nodeId, nodeData, onClose, onUpdate }: NodeConfigPanelProps) => {
   const handleConfigUpdate = (config: any) => {
     onUpdate(nodeId, config);
   };
+
+  const definition = NODE_DEFINITIONS[nodeData.type];
+  const isFreeAI = FREE_AI_NODES.includes(nodeData.type);
+  const requiresAPI = API_REQUIRED_NODES.includes(nodeData.type);
 
   const renderConfigForm = () => {
     switch (nodeData.type) {
@@ -57,21 +67,41 @@ export const NodeConfigPanel = ({ nodeId, nodeData, onClose, onUpdate }: NodeCon
       case 'if-condition':
         return <ConditionConfig config={nodeData.config} onUpdate={handleConfigUpdate} />;
       default:
-        return <div className="text-muted-foreground">No configuration available</div>;
+        return (
+          <div className="p-4 bg-muted/50 rounded-lg">
+            <p className="text-sm text-muted-foreground">
+              This node is ready to use with default settings.
+            </p>
+          </div>
+        );
     }
   };
 
   return (
     <Card className="w-80 h-full overflow-y-auto border-l">
-      <CardHeader className="sticky top-0 bg-card z-10 border-b">
+      <CardHeader className="sticky top-0 bg-card z-10 border-b pb-4">
         <div className="flex items-start justify-between">
-          <div>
+          <div className="space-y-1">
             <CardTitle className="text-lg">{nodeData.label}</CardTitle>
-            <CardDescription className="text-xs mt-1">{nodeData.description}</CardDescription>
+            <CardDescription className="text-xs">{definition?.description || nodeData.description}</CardDescription>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
+          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 shrink-0">
             <X className="h-4 w-4" />
           </Button>
+        </div>
+        {/* Status Badge */}
+        <div className="pt-2">
+          {isFreeAI && (
+            <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20">
+              <CheckCircle className="w-3 h-3 mr-1" />
+              Powered by Free AI
+            </Badge>
+          )}
+          {requiresAPI && (
+            <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/20">
+              API Key Required
+            </Badge>
+          )}
         </div>
       </CardHeader>
       <CardContent className="pt-6">
