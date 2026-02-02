@@ -18,7 +18,6 @@ import { CustomNode } from '@/components/workflow/CustomNode';
 import { NodeLibrary } from '@/components/workflow/NodeLibrary';
 import { NodeConfigPanel } from '@/components/workflow/NodeConfigPanel';
 import { AIWorkflowGenerator } from '@/components/workflow/AIWorkflowGenerator';
-import { ConnectionSetupPanel } from '@/components/workflow/ConnectionSetupPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Save, Play, ArrowLeft, Sparkles } from 'lucide-react';
@@ -449,15 +448,14 @@ const AgentBuilderContent = () => {
     });
   };
 
+  const selectedNode = nodes.find(n => n.id === selectedNodeId);
+
   return (
     <div className="flex flex-col h-screen bg-background">
+      {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
         <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate('/dashboard')}
-          >
+          <Button variant="ghost" size="icon" onClick={() => navigate('/agent-studio')}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <Input
@@ -474,13 +472,9 @@ const AgentBuilderContent = () => {
               setEdges(workflow.edges);
             }}
           />
-          <Button 
-            variant="secondary" 
-            size="sm" 
-            onClick={loadDemoWorkflow}
-          >
+          <Button variant="secondary" size="sm" onClick={loadDemoWorkflow}>
             <Sparkles className="w-4 h-4 mr-2" />
-            Load Demo
+            Demo
           </Button>
           <Button 
             variant="outline" 
@@ -491,23 +485,19 @@ const AgentBuilderContent = () => {
             <Play className="w-4 h-4 mr-2" />
             {isExecuting ? 'Testing...' : 'Test'}
           </Button>
-          <Button 
-            size="sm" 
-            onClick={handleSave}
-            disabled={isSaving}
-          >
+          <Button size="sm" onClick={handleSave} disabled={isSaving}>
             <Save className="w-4 h-4 mr-2" />
             {isSaving ? 'Saving...' : 'Save'}
           </Button>
         </div>
       </div>
 
+      {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
-        <div className="flex flex-col">
-          <ConnectionSetupPanel />
-          <NodeLibrary onNodeDragStart={onNodeDragStart} />
-        </div>
+        {/* Left Panel - Node Library */}
+        <NodeLibrary onNodeDragStart={onNodeDragStart} />
         
+        {/* Canvas */}
         <div className="flex-1" ref={reactFlowWrapper}>
           <ReactFlow
             nodes={nodes}
@@ -529,10 +519,11 @@ const AgentBuilderContent = () => {
           </ReactFlow>
         </div>
 
-        {selectedNodeId && (
+        {/* Right Panel - Node Config */}
+        {selectedNodeId && selectedNode && (
           <NodeConfigPanel
             nodeId={selectedNodeId}
-            nodeData={nodes.find(n => n.id === selectedNodeId)?.data as AgentNodeData}
+            nodeData={selectedNode.data as AgentNodeData}
             onClose={() => setSelectedNodeId(null)}
             onUpdate={updateNodeConfig}
           />
