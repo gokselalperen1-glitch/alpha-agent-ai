@@ -2,7 +2,7 @@ import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useLocation } from "react-router-dom";
-import { LogOut, Bot, LayoutDashboard, Wallet, Settings, Brain, Target, ArrowRightLeft } from "lucide-react";
+import { LogOut, Bot, LayoutDashboard, Wallet, Settings, Brain, Target, ArrowRightLeft, TrendingUp, Landmark } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -52,6 +52,18 @@ export const DashboardNav = ({ user }: DashboardNavProps) => {
               <Button variant="ghost" size="sm" className={cn("gap-2", isActive('/arbitrage') && "bg-secondary/20")} onClick={() => navigate('/arbitrage')}>
                 <ArrowRightLeft className="h-4 w-4" />
                 Arbitrage
+              </Button>
+              <Button variant="ghost" size="sm" className={cn("gap-2", isActive('/investment-brokers') && "bg-secondary/20")} onClick={() => navigate('/investment-brokers')}>
+                <Landmark className="h-4 w-4" />
+                Brokers
+              </Button>
+              <Button variant="ghost" size="sm" className={cn("gap-2", isActive('/investment-portfolio') && "bg-secondary/20")} onClick={() => navigate('/investment-portfolio')}>
+                <TrendingUp className="h-4 w-4" />
+                Holdings
+              </Button>
+              <Button variant="ghost" size="sm" className={cn("gap-2", isActive('/investment-transactions') && "bg-secondary/20")} onClick={() => navigate('/investment-transactions')}>
+                <ArrowRightLeft className="h-4 w-4" />
+                Transactions
               </Button>
               <Button variant="ghost" size="sm" className={cn("gap-2", isActive('/exchange-connections') && "bg-secondary/20")} onClick={() => navigate('/exchange-connections')}>
                 <Settings className="h-4 w-4" />
