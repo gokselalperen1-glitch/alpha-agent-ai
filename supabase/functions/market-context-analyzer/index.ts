@@ -127,9 +127,9 @@ Provide a comprehensive market analysis with trading recommendations.`;
 
   } catch (error: any) {
     console.error("Market analysis error:", error);
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       success: false,
-      error: error.message || "Failed to analyze market context" 
+      error: "Failed to analyze market context"
     }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
