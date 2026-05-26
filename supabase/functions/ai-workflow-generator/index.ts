@@ -145,9 +145,9 @@ Return ONLY the JSON workflow, no markdown or explanation.`;
 
   } catch (error: any) {
     console.error("Workflow generation error:", error);
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       success: false,
-      error: error.message || "Failed to generate workflow" 
+      error: "Failed to generate workflow"
     }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
