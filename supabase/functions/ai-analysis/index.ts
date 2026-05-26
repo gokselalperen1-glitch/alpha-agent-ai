@@ -15,13 +15,19 @@ interface AIAnalysisRequest {
   marketData?: any;
 }
 
+import { requireAuth } from "../_shared/auth.ts";
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const auth = await requireAuth(req);
+  if (auth instanceof Response) return auth;
+
   try {
     const { capability, symbols, model, additionalContext, outputFormat, marketData }: AIAnalysisRequest = await req.json();
+    
     
     console.log(`AI Analysis: ${capability} for ${symbols.join(', ')}`);
 

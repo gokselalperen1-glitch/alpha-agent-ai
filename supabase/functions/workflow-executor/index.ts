@@ -1384,27 +1384,36 @@ serve(async (req) => {
   }
 
   try {
+    // Require authentication for all executions (including test mode)
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { agentId, workflowData, testMode = false } = await req.json();
-    
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    let userId = 'test-user';
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    let userId = user.id;
     let isPaperTrading = true;
     let executionId = crypto.randomUUID();
 
-    // In test mode, skip auth and agent lookup
+    // In test mode, skip agent lookup but keep authenticated user context
     if (!testMode) {
-      // Get auth token
-      const authHeader = req.headers.get('Authorization');
-      if (!authHeader) throw new Error('No authorization header');
-
-      const token = authHeader.replace('Bearer ', '');
-      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-      if (authError || !user) throw new Error('Unauthorized');
-
-      userId = user.id;
 
       // Get agent details
       const { data: agent, error: agentError } = await supabase
@@ -1499,7 +1508,7 @@ serve(async (req) => {
   } catch (error: any) {
     console.error('Execution error:', error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: 'Execution failed' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { requireAuth } from "../_shared/auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,6 +10,9 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const auth = await requireAuth(req);
+  if (auth instanceof Response) return auth;
 
   try {
     const { description, userGoals } = await req.json();
@@ -141,9 +145,9 @@ Return ONLY the JSON workflow, no markdown or explanation.`;
 
   } catch (error: any) {
     console.error("Workflow generation error:", error);
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       success: false,
-      error: error.message || "Failed to generate workflow" 
+      error: "Failed to generate workflow"
     }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
