@@ -152,7 +152,7 @@ export const LiveDemoEngine = ({ onClose }: LiveDemoEngineProps) => {
   const [lastSignal, setLastSignal] = useState<{ signal: string; reasoning: string } | null>(null);
   const [tickCount, setTickCount] = useState(0);
   const [tickData, setTickData] = useState<TickData | null>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const filteredStrategies = STRATEGIES.filter(s => s.riskLevel === selectedRiskLevel);
 
