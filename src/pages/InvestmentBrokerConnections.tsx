@@ -87,7 +87,7 @@ const InvestmentBrokerConnections = () => {
         return;
       }
 
-      setConnections(data || []);
+      setConnections((data as any) || []);
     } catch (error) {
       console.error('Error loading connections:', error);
     }
