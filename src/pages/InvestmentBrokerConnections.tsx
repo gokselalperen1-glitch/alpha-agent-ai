@@ -87,7 +87,7 @@ const InvestmentBrokerConnections = () => {
         return;
       }
 
-      setConnections(data || []);
+      setConnections((data as any) || []);
     } catch (error) {
       console.error('Error loading connections:', error);
     }
@@ -160,12 +160,13 @@ const InvestmentBrokerConnections = () => {
       const { data, error } = await supabase
         .from('investment_broker_connections')
         .insert({
+          user_id: user!.id,
           broker_type: formData.brokerType,
           account_name: formData.accountName,
           account_number: formData.accountNumber,
-          api_key_encrypted: formData.apiKey ? Buffer.from(formData.apiKey).toString('base64') : null,
-          api_secret_encrypted: formData.apiSecret ? Buffer.from(formData.apiSecret).toString('base64') : null,
-          auth_token_encrypted: formData.authToken ? Buffer.from(formData.authToken).toString('base64') : null,
+          api_key_encrypted: formData.apiKey ? btoa(formData.apiKey) : null,
+          api_secret_encrypted: formData.apiSecret ? btoa(formData.apiSecret) : null,
+          auth_token_encrypted: formData.authToken ? btoa(formData.authToken) : null,
           is_testnet: formData.isTestnet,
           is_active: true,
         })

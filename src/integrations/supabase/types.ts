@@ -267,6 +267,172 @@ export type Database = {
           },
         ]
       }
+      investment_broker_connections: {
+        Row: {
+          account_name: string | null
+          account_number: string | null
+          api_key_encrypted: string | null
+          api_secret_encrypted: string | null
+          auth_token_encrypted: string | null
+          broker_type: string
+          created_at: string
+          health_status: string
+          id: string
+          is_active: boolean
+          is_testnet: boolean
+          last_health_check: string | null
+          last_sync_at: string | null
+          permissions: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_name?: string | null
+          account_number?: string | null
+          api_key_encrypted?: string | null
+          api_secret_encrypted?: string | null
+          auth_token_encrypted?: string | null
+          broker_type: string
+          created_at?: string
+          health_status?: string
+          id?: string
+          is_active?: boolean
+          is_testnet?: boolean
+          last_health_check?: string | null
+          last_sync_at?: string | null
+          permissions?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_name?: string | null
+          account_number?: string | null
+          api_key_encrypted?: string | null
+          api_secret_encrypted?: string | null
+          auth_token_encrypted?: string | null
+          broker_type?: string
+          created_at?: string
+          health_status?: string
+          id?: string
+          is_active?: boolean
+          is_testnet?: boolean
+          last_health_check?: string | null
+          last_sync_at?: string | null
+          permissions?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      investment_holdings: {
+        Row: {
+          asset_name: string | null
+          asset_symbol: string
+          average_cost: number | null
+          connection_id: string | null
+          created_at: string
+          current_price: number | null
+          gain_loss: number | null
+          gain_loss_percent: number | null
+          id: string
+          last_updated: string
+          market_value: number | null
+          quantity: number
+          user_id: string
+        }
+        Insert: {
+          asset_name?: string | null
+          asset_symbol: string
+          average_cost?: number | null
+          connection_id?: string | null
+          created_at?: string
+          current_price?: number | null
+          gain_loss?: number | null
+          gain_loss_percent?: number | null
+          id?: string
+          last_updated?: string
+          market_value?: number | null
+          quantity?: number
+          user_id: string
+        }
+        Update: {
+          asset_name?: string | null
+          asset_symbol?: string
+          average_cost?: number | null
+          connection_id?: string | null
+          created_at?: string
+          current_price?: number | null
+          gain_loss?: number | null
+          gain_loss_percent?: number | null
+          id?: string
+          last_updated?: string
+          market_value?: number | null
+          quantity?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investment_holdings_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "investment_broker_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      investment_transactions: {
+        Row: {
+          asset_symbol: string
+          connection_id: string | null
+          created_at: string
+          fees: number | null
+          id: string
+          notes: string | null
+          price: number | null
+          quantity: number
+          total_amount: number | null
+          transaction_date: string
+          transaction_type: string
+          user_id: string
+        }
+        Insert: {
+          asset_symbol: string
+          connection_id?: string | null
+          created_at?: string
+          fees?: number | null
+          id?: string
+          notes?: string | null
+          price?: number | null
+          quantity?: number
+          total_amount?: number | null
+          transaction_date?: string
+          transaction_type: string
+          user_id: string
+        }
+        Update: {
+          asset_symbol?: string
+          connection_id?: string | null
+          created_at?: string
+          fees?: number | null
+          id?: string
+          notes?: string | null
+          price?: number | null
+          quantity?: number
+          total_amount?: number | null
+          transaction_date?: string
+          transaction_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investment_transactions_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "investment_broker_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leverage_settings: {
         Row: {
           created_at: string
