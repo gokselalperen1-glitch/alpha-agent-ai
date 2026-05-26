@@ -49,8 +49,8 @@ export const useExchangeWebSocket = (options: UseExchangeWebSocketOptions = {}) 
   const [lastHeartbeat, setLastHeartbeat] = useState<number>(0);
   
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const heartbeatTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const heartbeatTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
 
   const connect = useCallback(async () => {
